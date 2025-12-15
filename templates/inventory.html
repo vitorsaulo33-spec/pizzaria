@@ -1,0 +1,1339 @@
+{% extends "base.html" %}
+{% block title %}Estoque & Inteligência - ALIV{% endblock %}
+
+{% block head %}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Select2 Dark Mode */
+        .select2-container--default .select2-selection--single { background-color: #0f172a; border-color: #475569; color: #fff; height: 42px; display: flex; align-items: center; }
+        .select2-dropdown { background-color: #1e293b; border-color: #475569; color: #fff; }
+        .select2-search__field { background-color: #0f172a; color: #fff; border-color: #475569; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { color: #fff; line-height: 42px; padding-left: 12px; }
+        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 40px; }
+        .select2-results__option--highlighted[aria-selected] { background-color: #6366f1; }
+        
+        .nav-tab { cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; }
+        .nav-tab.active { border-bottom-color: #6366f1; color: #fff; font-weight: bold; }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background-color: #1e293b; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-[1600px] mx-auto p-6 space-y-6">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10"><i class="fas fa-coins text-5xl text-green-400"></i></div>
+            <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Valor em Estoque</p>
+            <h2 class="text-3xl font-bold text-white mt-1">R$ {{ "%.2f"|format(total_value) }}</h2>
+        </div>
+        <div onclick="showCriticalItems()" class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg relative overflow-hidden cursor-pointer hover:bg-slate-700/50 transition group">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                <i class="fas fa-exclamation-triangle text-5xl text-red-400"></i>
+            </div>
+            <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Reposição Urgente</p>
+            <h2 class="text-3xl font-bold text-red-400 mt-1">
+                {{ critical_count }} <span class="text-sm font-normal text-slate-500">itens</span>
+            </h2>
+            <div class="mt-2 text-[10px] text-red-400/70 font-bold flex items-center gap-1 group-hover:text-red-400 transition">
+                <span>VER LISTA</span> <i class="fas fa-arrow-right"></i>
+            </div>
+        </div>
+        <div onclick="showExpiringItems()" class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg relative group cursor-pointer hover:bg-slate-700/50 transition">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                <i class="fas fa-calendar-times text-5xl text-orange-400"></i>
+            </div>
+            
+            <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Vencendo (7 dias)</p>
+            <h2 class="text-3xl font-bold text-orange-400 mt-1">
+                {{ expiring_list|length }} <span class="text-sm font-normal text-slate-500">itens</span>
+            </h2>
+            
+            <div class="mt-2 text-[10px] text-orange-400/70 font-bold flex items-center gap-1 group-hover:text-orange-400 transition">
+                <span>VER LISTA</span> <i class="fas fa-arrow-right"></i>
+            </div>
+        </div>
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg relative overflow-hidden flex flex-col justify-center items-center text-center cursor-pointer hover:bg-indigo-900/20 transition border-indigo-500/30" onclick="switchTab('forecast')">
+            <i class="fas fa-robot text-3xl text-indigo-400 mb-2"></i><h3 class="font-bold text-white text-sm">Sugestão de Compra</h3><p class="text-[10px] text-slate-400">IA Personalizada</p>
+        </div>
+    </div>
+
+    <div class="flex border-b border-slate-700 pb-1 gap-4 overflow-x-auto">
+        <div onclick="switchTab('manage')" id="btn-manage" class="nav-tab active px-4 py-2 text-sm text-slate-400 flex items-center gap-2"><i class="fas fa-boxes"></i> Gerenciamento</div>
+        <div onclick="switchTab('transactions')" id="btn-transactions" class="nav-tab px-4 py-2 text-sm text-slate-400 flex items-center gap-2">
+            <i class="fas fa-exchange-alt"></i> Entradas/Saídas
+        </div>
+        <div onclick="switchTab('production')" id="btn-production" class="nav-tab px-4 py-2 text-sm text-slate-400 flex items-center gap-2"><i class="fas fa-blender"></i> Receitas & Produção</div>
+        <div onclick="switchTab('invoices')" id="btn-invoices" class="nav-tab px-4 py-2 text-sm text-slate-400 flex items-center gap-2"><i class="fas fa-file-invoice-dollar"></i> Notas & Financeiro</div>
+        <div onclick="switchTab('consumption')" id="btn-consumption" class="nav-tab px-4 py-2 text-sm text-slate-400 flex items-center gap-2"><i class="fas fa-chart-pie"></i> Relatório de Consumo</div>
+        <div onclick="switchTab('forecast')" id="btn-forecast" class="nav-tab px-4 py-2 text-sm text-slate-400 flex items-center gap-2"><i class="fas fa-shopping-cart"></i> Previsão de Compra</div>
+    </div>
+
+    <div id="tab-manage" class="tab-content active">
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-4 flex flex-col xl:flex-row justify-between items-center gap-4">
+            <div class="flex gap-2 w-full xl:w-auto flex-wrap">
+                <button onclick="openIngModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg flex items-center gap-2"><i class="fas fa-plus"></i> Novo Item</button>
+                <button onclick="document.getElementById('invoiceInputManage').click()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg flex items-center gap-2"><i class="fas fa-file-import"></i> Nota (XML/PDF)</button>
+                <input type="file" id="invoiceInputManage" class="hidden" accept="image/*,.pdf,.xml" onchange="startInvoiceUpload(this)">
+                <div class="flex gap-1">
+                    <button onclick="openManager(inventoryCategoriesData, 'category', 'Categorias')" class="text-xs bg-slate-900 border border-slate-600 px-3 py-2 rounded text-slate-300 hover:text-white">Categorias</button>
+                    <button onclick="openManager(inventoryUnitsData, 'unit', 'Unidades')" class="text-xs bg-slate-900 border border-slate-600 px-3 py-2 rounded text-slate-300 hover:text-white">Unidades</button>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-2 w-full xl:w-auto justify-end">
+                <form class="flex gap-2" onsubmit="event.preventDefault(); filterTable();">
+                    <select id="filterCategory" onchange="filterTable()" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none"><option value="all">Todas Categorias</option>{% for cat in categories %}<option value="{{ cat.id }}" {% if filters.cat == cat.id|string %}selected{% endif %}>{{ cat.name }}</option>{% endfor %}</select>
+                    
+                    <select id="filterStatus" onchange="filterTable()" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none">
+                        <option value="all">Status (Todos)</option>
+                        <option value="low" {% if filters.status == 'low' %}selected{% endif %}>🔻 Baixo Estoque</option>
+                        <option value="over" {% if filters.status == 'over' %}selected{% endif %}>🔺 Excesso</option>
+                        <option value="expiring">⏳ Vencendo (7d)</option> </select>
+
+                    <input type="text" id="searchStock" onkeyup="filterTable()" value="{{ filters.search }}" placeholder="Buscar (Instantâneo)..." class="bg-slate-900 border border-slate-600 rounded-lg pl-3 pr-3 py-2 text-sm text-white outline-none w-48 transition focus:w-64">
+                </form>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-700">
+            <div class="overflow-x-auto max-h-[600px] custom-scroll">
+                <table class="min-w-full text-sm text-left relative">
+                    <thead class="bg-slate-900 text-slate-400 uppercase text-xs font-bold border-b border-slate-700 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-6 py-4">Ingrediente</th>
+                            <th class="px-6 py-4">Níveis</th>
+                            <th class="px-6 py-4">Estoque</th>
+                            <th class="px-6 py-4 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50" id="stockTableBody">
+                        {% for ing in ingredients %}
+                        
+                            <tr class="hover:bg-slate-700/30 transition group stock-row" 
+                            data-name="{{ ing.name|lower }}" 
+                            data-catid="{{ ing.category_id }}" 
+                            data-status="{{ 'low' if ing.current <= ing.min else ('over' if ing.current >= ing.max else 'ok') }}"
+                            data-expiry="{{ ing.expiration_date }}">
+
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-white">{{ ing.name }}</div>
+                                <div class="text-xs text-slate-500">{{ ing.category_name }}</div>
+                            </td>
+                            <td class="px-6 py-4 w-1/3">
+                                <div class="flex justify-between text-[10px] text-slate-400 mb-1"><span>Min: {{ ing.min|int }}</span><span>Max: {{ ing.max|int }}</span></div>
+                                <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-700"><div class="h-full rounded-full bg-{{ ing.status_color }}-500" style="width: {{ ing.percent }}%"></div></div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-lg font-bold text-white">{{ "%.2f"|format(ing.current) }} <span class="text-sm text-slate-500">{{ ing.unit }}</span></div>
+                                <div class="text-xs text-green-400 font-mono">R$ {{ "%.2f"|format(ing.cost) }} /un</div>
+                            </td>
+                            <td class="px-6 py-4 text-right whitespace-nowrap">
+                                <button onclick="editIng({{ ing.id }})" class="p-2 text-blue-400 hover:bg-blue-500/10 rounded transition"><i class="fas fa-edit"></i></button>
+                                <button onclick="deleteIng({{ ing.id }})" class="p-2 text-red-400 hover:bg-red-500/10 rounded transition"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-transactions" class="tab-content">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg h-fit">
+                <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <i class="fas fa-pen-square text-indigo-500"></i> Nova Movimentação
+                </h3>
+                
+                <form onsubmit="submitTransaction(event)" class="space-y-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase mb-1 block">Tipo de Operação</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="transType" value="in" class="peer hidden" checked>
+                                <div class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-center text-xs font-bold text-slate-400 peer-checked:bg-green-600 peer-checked:text-white peer-checked:border-green-500 transition">
+                                    <i class="fas fa-arrow-down mr-1"></i> Entrada
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="transType" value="out" class="peer hidden">
+                                <div class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-center text-xs font-bold text-slate-400 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-500 transition">
+                                    <i class="fas fa-arrow-up mr-1"></i> Saída
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="transType" value="adjust" class="peer hidden">
+                                <div class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-center text-xs font-bold text-slate-400 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-500 transition">
+                                    <i class="fas fa-balance-scale mr-1"></i> Balanço
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase mb-1 block">Ingrediente</label>
+                        <select id="transIngSelect" class="w-full"></select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase mb-1 block">Quantidade</label>
+                            <input type="number" id="transQty" step="any" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white font-bold outline-none focus:border-indigo-500">
+                        </div>
+                        <div class="flex items-end pb-2">
+                            <span id="transUnitLabel" class="text-xs text-yellow-500 font-bold">UN</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase mb-1 block">Motivo / Obs</label>
+                        <input type="text" id="transReason" placeholder="Ex: Compra Mercado, Avaria, Contagem..." class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                    </div>
+
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-lg font-bold shadow-lg transition mt-2">
+                        CONFIRMAR LANÇAMENTO
+                    </button>
+                </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800 rounded-2xl border border-slate-700 shadow-lg overflow-hidden flex flex-col max-h-[600px]">
+                <div class="p-4 border-b border-slate-700 bg-slate-900/50">
+                    <h3 class="font-bold text-white flex items-center gap-2"><i class="fas fa-history text-slate-400"></i> Histórico Recente</h3>
+                </div>
+                <div class="overflow-y-auto custom-scroll flex-1 p-0">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-900 text-slate-500 uppercase text-[10px] font-bold sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Data</th>
+                                <th class="px-4 py-3">Item</th>
+                                <th class="px-4 py-3">Tipo</th>
+                                <th class="px-4 py-3 text-right">Qtd</th>
+                                <th class="px-4 py-3">Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transHistoryList" class="divide-y divide-slate-700/50 text-slate-300">
+                            <tr><td colspan="5" class="p-4 text-center text-slate-500 italic">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-production" class="tab-content">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[750px]">
+            
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-col h-full">
+    
+                <div class="bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg mb-4 flex gap-3 items-start">
+                    <i class="fas fa-info-circle text-blue-400 mt-1"></i>
+                    <div>
+                        <h4 class="text-xs font-bold text-blue-300 uppercase">Como criar uma receita?</h4>
+                        <p class="text-[10px] text-slate-400 leading-relaxed">
+                            Para que um item apareça aqui, crie-o primeiro na aba <b>Gerenciamento</b> e coloque-o em uma categoria chamada <b class="text-white">"Receitas"</b> ou <b class="text-white">"Produção"</b>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                        <i class="fas fa-search text-indigo-500"></i> Produtos Finais
+                    </h3>
+                    <input type="text" id="searchRecipe" onkeyup="filterRecipeList()" placeholder="Buscar..." class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white outline-none focus:border-indigo-500 transition text-sm">
+                    
+                    <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                        <input type="checkbox" id="chkOnlyRecipes" onchange="filterRecipeList()" class="w-4 h-4 rounded bg-slate-900 border-slate-600 text-indigo-500 focus:ring-indigo-500" checked>
+                        <span class="text-xs text-slate-400 select-none">Mostrar apenas itens de Receita/Produção</span>
+                    </label>
+                </div>
+
+                <div class="flex-1 overflow-y-auto custom-scroll space-y-2 pr-2" id="recipeSourceList">
+                    {% for ing in ingredients %}
+                    <div class="recipe-item-row bg-slate-900 p-3 rounded-lg border border-slate-700 flex justify-between items-center hover:bg-slate-700/50 cursor-pointer transition group"
+                        data-name="{{ ing.name|lower }}"
+                        data-category="{{ ing.category_name|lower }}"
+                        onclick="openRecipeManager({{ ing.id }}, '{{ ing.name|replace("'", "") }}')">
+                        <div>
+                            <div class="font-bold text-white text-sm group-hover:text-indigo-400 transition">{{ ing.name }}</div>
+                            <div class="flex gap-2 mt-1">
+                                <span class="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 border border-slate-600">{{ ing.category_name }}</span>
+                                <span class="text-[9px] text-slate-500">Estoque: {{ "%.2f"|format(ing.current) }} {{ ing.unit }}</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-600 group-hover:text-white"></i>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-col h-full relative">
+                
+                <div id="recipeEmptyState" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+                    <i class="fas fa-arrow-left text-4xl mb-4 animate-bounce-x"></i>
+                    <p>Selecione um item ao lado para editar.</p>
+                </div>
+
+                <div id="recipeEditor" class="hidden flex flex-col h-full">
+                    <div class="flex justify-between items-start mb-6 pb-4 border-b border-slate-700">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ficha Técnica</span>
+                            <h3 class="text-xl font-bold text-yellow-400 leading-tight mt-1" id="lblRecipeName">...</h3>
+                        </div>
+                        <div class="flex flex-col gap-2 items-end">
+                            <button onclick="document.getElementById('recipeEditor').classList.add('hidden'); document.getElementById('recipeEmptyState').classList.remove('hidden');" 
+                                    class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-xs font-bold shadow transition flex items-center gap-2">
+                                <i class="fas fa-save"></i> SALVAR & FECHAR
+                            </button>
+                            <button onclick="openProductionModalFromEditor()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded text-xs font-bold shadow flex items-center gap-2">
+                                <i class="fas fa-play"></i> EXECUTAR (PRODUZIR)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700 mb-4 shadow-inner">
+                        <label class="text-[10px] text-indigo-400 font-bold uppercase mb-2 block flex items-center gap-1">
+                            <i class="fas fa-plus-circle"></i> Adicionar Insumo à Receita
+                        </label>
+                        <form onsubmit="addIngredientToRecipe(event)" class="flex gap-3 items-end">
+                            <input type="hidden" id="recParentId">
+                            <div class="flex-1">
+                                <label class="text-[9px] text-slate-500 font-bold uppercase mb-1 block">Insumo</label>
+                                <select id="recChildId" class="w-full"></select>
+                            </div>
+                            <div class="w-28 relative">
+                                <label class="text-[9px] text-slate-500 font-bold uppercase mb-1 block">Quantidade</label>
+                                <input type="number" id="recQty" step="any" placeholder="0.00" class="w-full bg-slate-900 border border-slate-600 rounded-lg text-white text-sm p-2 pl-3 outline-none font-bold focus:border-indigo-500 h-[42px]">
+                                <span id="recUnitLabel" class="absolute right-3 top-8 text-[10px] text-yellow-500 font-bold z-10 pointer-events-none transform -translate-y-1/2">UN</span>
+                            </div>
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 h-[42px] rounded-lg shadow-lg font-bold flex items-center justify-center gap-2 transition hover:scale-105 min-w-[100px]" title="Adicionar Item">
+                                <i class="fas fa-plus"></i> ADICIONAR
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto custom-scroll bg-slate-900/30 rounded-xl border border-slate-700 relative">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-900 text-slate-500 text-[10px] uppercase font-bold sticky top-0 shadow-sm">
+                                <tr>
+                                    <th class="p-3 pl-4">Insumo Consumido</th>
+                                    <th class="p-3 text-right">Qtd (Receita)</th>
+                                    <th class="p-3 text-right pr-4">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recipeItemsList" class="divide-y divide-slate-700/50 text-slate-300">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-invoices" class="tab-content">
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg">
+            
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Notas & Contas</h2>
+                    <p class="text-xs text-slate-400">Gerencie pagamentos a fornecedores.</p>
+                </div>
+
+                <div class="flex gap-2 items-center w-full md:w-auto">
+                    <select id="billFilterStatus" onchange="loadBills()" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500">
+                        <option value="all">Todas</option>
+                        <option value="pending" selected>Pendentes (A Pagar)</option>
+                        <option value="paid">Concluídas (Pagas)</option>
+                    </select>
+
+                    <button onclick="document.getElementById('invoiceInputFinancial').click()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg flex items-center gap-2 transition hover:scale-105 whitespace-nowrap">
+                        <i class="fas fa-file-invoice-dollar"></i> Nova Nota
+                    </button>
+                    <input type="file" id="invoiceInputFinancial" class="hidden" accept="image/*,.pdf,.xml" onchange="startInvoiceUpload(this)">
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-slate-900 text-slate-400 uppercase text-xs font-bold border-b border-slate-700">
+                        <tr>
+                            <th class="px-6 py-3">Vencimento</th>
+                            <th class="px-6 py-3">Descrição / Ref</th>
+                            <th class="px-6 py-3">Valor</th>
+                            <th class="px-6 py-3">Método</th>
+                            <th class="px-6 py-3 text-center">Status</th>
+                            <th class="px-6 py-3 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="billsList" class="divide-y divide-slate-700/50 text-slate-300">
+                        </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-slate-700 flex justify-end gap-6 text-sm">
+                <div class="text-slate-400">Total na Tela: <span id="billsTotalDisplay" class="text-white font-bold font-mono">R$ 0.00</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-consumption" class="tab-content">
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
+                <div><h2 class="text-xl font-bold text-white">Relatório de Insumos</h2><p class="text-sm text-slate-400">Movimentação baseada em fichas técnicas.</p></div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <input type="date" id="reportStart" class="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-white text-xs">
+                    <input type="date" id="reportEnd" class="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-white text-xs">
+                    <button onclick="loadConsumptionReport()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded font-bold text-xs shadow-lg">BUSCAR</button>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 rounded-xl border border-slate-700 overflow-hidden">
+                <div class="overflow-x-auto max-h-[500px] custom-scroll">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-900 text-slate-400 uppercase text-xs font-bold border-b border-slate-700 sticky top-0">
+                            <tr><th class="px-6 py-3">Insumo</th><th class="px-6 py-3">Categoria</th><th class="px-6 py-3 text-right">Qtd Consumida</th><th class="px-6 py-3 text-right">Custo Total</th></tr>
+                        </thead>
+                        <tbody id="consumptionList" class="divide-y divide-slate-700/50 text-slate-300">
+                            <tr><td colspan="4" class="py-10 text-center italic text-slate-500">Selecione o período acima.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-forecast" class="tab-content">
+        <div class="bg-gradient-to-br from-indigo-900 to-slate-900 p-8 rounded-3xl border border-indigo-500/30 text-center shadow-2xl">
+            <i class="fas fa-magic text-4xl text-indigo-400 mb-4"></i>
+            <h2 class="text-2xl font-bold text-white mb-2">IA de Abastecimento</h2>
+            <p class="text-slate-300 mb-6 text-sm">Configuração de previsão personalizada.</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center items-end mb-8 max-w-3xl mx-auto bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                <div class="text-left">
+                    <label class="text-[10px] text-slate-400 font-bold uppercase">Analisar Histórico De:</label>
+                    <input type="date" id="forecastStart" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-sm">
+                </div>
+                <div class="text-left">
+                    <label class="text-[10px] text-slate-400 font-bold uppercase">Até:</label>
+                    <input type="date" id="forecastEnd" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-sm">
+                </div>
+                <div class="text-left w-32">
+                    <label class="text-[10px] text-slate-400 font-bold uppercase">Cobrir (Dias):</label>
+                    <input type="number" id="forecastDays" value="3" min="1" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-sm font-bold text-center">
+                </div>
+                <button onclick="generateForecast()" class="bg-white text-indigo-900 hover:bg-indigo-50 px-6 py-2 rounded-lg font-bold text-sm shadow-lg transition h-[38px] flex items-center gap-2">
+                    <i class="fas fa-bolt"></i> Gerar
+                </button>
+            </div>
+            <div id="forecastResult" class="hidden text-left max-w-4xl mx-auto animate-fade-in-up">
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-xl">
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                        <h4 class="text-lg font-bold text-green-400 flex items-center gap-2"><i class="fas fa-shopping-cart"></i> Lista de Compras</h4>
+                        <button onclick="copyForecast()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded font-bold transition flex items-center gap-1"><i class="far fa-copy"></i> Copiar</button>
+                    </div>
+                    <div class="bg-slate-900/50 rounded-xl border border-slate-700 overflow-hidden mb-6">
+                         <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-700">
+                                <tr><th class="px-4 py-2 w-10">#</th><th class="px-4 py-2">Produto</th><th class="px-4 py-2 text-right">Qtd Compra</th><th class="px-4 py-2 text-right">Unit.</th><th class="px-4 py-2 text-right">Total</th></tr>
+                            </thead>
+                            <tbody id="forecastTableBody" class="divide-y divide-slate-700/50 text-slate-300"></tbody>
+                         </table>
+                    </div>
+                    <div class="text-right mb-4"><span class="text-xs text-slate-500 uppercase font-bold mr-2">Total Estimado:</span><span id="forecastTotal" class="text-xl font-bold text-white font-mono">R$ 0.00</span></div>
+                    <div class="mt-4 pt-4 border-t border-slate-700/50 text-center"><p class="text-xs text-slate-500 font-bold uppercase mb-3"><i class="fas fa-chart-line mr-1"></i> Baseado na venda prevista de:</p><div id="forecastProds" class="flex flex-wrap gap-2 justify-center"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div id="ingModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeIngModal()"></div>
+    <div class="relative w-full max-w-lg bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 p-6 overflow-y-auto max-h-[90vh]" id="ingContent">
+        <h3 class="text-xl font-bold text-white mb-4" id="ingTitle">Novo Ingrediente</h3>
+        <form id="ingForm" onsubmit="submitIng(event)" class="space-y-5">
+            <input type="hidden" name="ing_id" id="ingId">
+            <div class="space-y-3">
+                <div><label class="text-[10px] text-slate-400 font-bold uppercase">Nome</label><input type="text" name="name" id="ingName" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm outline-none"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-[10px] text-slate-400 font-bold uppercase">Categoria</label><select name="category_id" id="ingCategory" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm outline-none">{% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select></div>
+                    <div><label class="text-[10px] text-slate-400 font-bold uppercase">Cód.</label><input type="text" name="integration_code" id="ingCode" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono outline-none"></div>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/70"><div class="grid grid-cols-10 gap-2 items-end"><div class="col-span-4"><label class="text-[9px] text-slate-500 font-bold uppercase block mb-1">Estoque</label><select name="unit_id" id="ingUnit" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm font-bold outline-none">{% for un in units %} <option value="{{ un.id }}">{{ un.name }}</option> {% endfor %}</select></div><div class="col-span-2 flex flex-col items-center"><label class="text-[9px] text-slate-500 font-bold uppercase block mb-1">Fator</label><input type="number" step="any" name="conversion_factor" id="ingFactor" placeholder="1" class="w-full bg-slate-800 border border-slate-600 rounded-lg py-2 text-center text-yellow-400 font-bold text-sm outline-none"></div><div class="col-span-4"><label class="text-[9px] text-slate-500 font-bold uppercase block mb-1">Receita (Conversão)</label><select name="usage_unit_id" id="ingUsageUnit" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-green-400 text-sm font-bold outline-none">{% for un in units %} <option value="{{ un.id }}">{{ un.name }}</option> {% endfor %}</select></div></div></div>
+            <div class="grid grid-cols-3 gap-4">
+                <div><label class="text-[10px] text-slate-400 font-bold uppercase">Atual</label><input type="number" step="any" name="current_stock" id="ingStock" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm outline-none font-bold"></div>
+                <div><label class="text-[10px] text-slate-400 font-bold uppercase">Mín</label><input type="number" step="any" name="min_stock" id="ingMin" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm outline-none"></div>
+                <div><label class="text-[10px] text-slate-400 font-bold uppercase">Máx</label><input type="number" step="any" name="max_stock" id="ingMax" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm outline-none"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="text-[10px] text-slate-400 font-bold uppercase">Custo Médio</label><input type="number" step="any" name="cost" id="ingCost" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm outline-none"></div>
+                <div><label class="text-[10px] text-orange-400 font-bold uppercase">Validade</label><input type="date" name="expiration_date" id="ingExpiry" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm outline-none"></div>
+            </div>
+            <div class="pt-4 border-t border-slate-700/50 mt-4"><div class="flex items-center gap-3 bg-slate-900 p-3 rounded-lg border border-slate-700"><input type="checkbox" name="is_available_for_sale" id="ingAvailable" class="w-5 h-5 rounded bg-slate-800 border-slate-500 text-green-500 focus:ring-green-500 cursor-pointer"><div class="flex flex-col"><label for="ingAvailable" class="text-sm font-bold text-white cursor-pointer select-none">Vender no Cardápio</label><span class="text-[10px] text-slate-400">Cria produto automaticamente.</span></div></div></div>
+            <div class="flex justify-end pt-4 border-t border-slate-700 gap-3"><button type="button" onclick="closeIngModal()" class="px-5 py-2 text-slate-400 hover:text-white font-bold text-sm">Cancelar</button><button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2 rounded-lg font-bold shadow-lg text-sm">Salvar</button></div>
+        </form>
+    </div>
+</div>
+
+<div id="financialUploadModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/90 backdrop-blur-sm"></div>
+    <div class="relative bg-slate-800 p-6 rounded-2xl border border-slate-600 w-full max-w-md">
+        <h3 class="text-lg font-bold text-white mb-4">Conferir Dados Financeiros</h3>
+        <div class="space-y-4">
+            <div><label class="text-xs font-bold text-slate-400 uppercase">Forma de Pagamento</label><select id="finPaymentMethod" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"><option value="Boleto">Boleto Bancário</option><option value="Pix">Pix</option><option value="Cartão Crédito">Cartão de Crédito</option><option value="Dinheiro">Dinheiro</option></select></div>
+            <div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-slate-400 uppercase">Vencimento</label><input type="date" id="finDueDate" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white"></div><div><label class="text-xs font-bold text-slate-400 uppercase">Valor Total (R$)</label><input type="number" step="0.01" id="finTotalValue" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold"></div></div>
+            <div class="flex items-center gap-2 bg-slate-900 p-3 rounded border border-slate-700"><input type="checkbox" id="finIsPaid" class="w-4 h-4 rounded text-green-500 focus:ring-green-500"><label for="finIsPaid" class="text-sm text-white font-bold">Conta já foi paga?</label></div>
+        </div>
+        <div class="mt-6 flex justify-end gap-2"><button onclick="document.getElementById('financialUploadModal').classList.add('hidden')" class="px-4 py-2 text-slate-400">Cancelar</button><button onclick="proceedToMatcher()" class="px-6 py-2 bg-indigo-600 text-white rounded font-bold shadow-lg">Confirmar e Importar</button></div>
+    </div>
+</div>
+
+<div id="matcherModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/90 backdrop-blur-sm"></div><div class="relative w-full max-w-6xl bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 flex flex-col max-h-[90vh]"><div class="p-5 border-b border-slate-700 bg-slate-900/50 rounded-t-2xl"><h3 class="text-xl font-bold text-white flex items-center gap-2"><i class="fas fa-robot text-purple-400"></i> Conferência de Itens</h3></div><div class="overflow-y-auto p-4 flex-1 min-h-[400px]"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-500 uppercase font-bold border-b border-slate-700"><tr><th class="pb-2 w-1/4">Item</th><th class="pb-2 w-20">Cód.</th><th class="pb-2 w-24">Qtd/$</th><th class="pb-2 w-16 text-center">Revenda?</th><th class="pb-2 w-1/3">Ação</th></tr></thead><tbody id="matcherList" class="divide-y divide-slate-700/50"></tbody></table></div><div class="p-4 border-t border-slate-700 bg-slate-900/50 rounded-b-2xl flex justify-end gap-3"><button onclick="closeMatcher()" class="px-4 py-2 text-slate-400 hover:text-white transition">Cancelar</button><button onclick="confirmEntry()" class="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold shadow-lg transition">Confirmar Entrada</button></div></div></div>
+
+<div id="productionModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeProdModal()"></div><div class="relative bg-slate-800 p-6 rounded-2xl border border-slate-600 w-full max-w-sm"><h3 class="text-xl font-bold text-white mb-2">Executar Produção</h3><p class="text-sm text-slate-400 mb-4">Isso aumentará o estoque do produto final e baixará os ingredientes.</p><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Produto</label><input type="text" id="prodTargetName" disabled class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-300 mb-3"><input type="hidden" id="prodTargetId"><label class="block text-xs font-bold text-green-400 uppercase mb-1">Quantidade a Produzir (<span id="prodUnitLabel"></span>)</label><input type="number" id="prodQuantity" class="w-full bg-slate-900 border border-green-500/50 rounded p-2 text-white font-bold text-lg mb-4" placeholder="0.00"><div class="flex justify-end gap-2"><button onclick="closeProdModal()" class="px-4 py-2 text-slate-400">Cancelar</button><button onclick="confirmProduction()" class="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-bold shadow-lg">Confirmar</button></div></div></div>
+
+<div id="billModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeBillModal()"></div>
+    <div class="relative w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 p-6">
+        <h3 class="text-xl font-bold text-white mb-4" id="billModalTitle">Nova Conta</h3>
+        
+        <form onsubmit="submitBill(event)" class="space-y-4">
+            <input type="hidden" id="billId">
+            
+            <div>
+                <label class="text-xs font-bold text-slate-400 uppercase">Descrição</label>
+                <input type="text" id="billDesc" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Valor (R$)</label>
+                    <input type="number" step="0.01" id="billAmount" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold text-green-400 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Vencimento</label>
+                    <input type="date" id="billDate" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-slate-400 uppercase">Forma de Pagamento</label>
+                <select id="billMethod" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none">
+                    <option value="Boleto">Boleto Bancário</option>
+                    <option value="Pix">Pix</option>
+                    <option value="Cartão Crédito">Cartão de Crédito</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="Transferência">Transferência</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-slate-700">
+                <button type="button" onclick="closeBillModal()" class="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancelar</button>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded font-bold text-sm shadow-lg">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% include "components/modal_manager.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/utils.js?v=6"></script>
+<script>
+    // --- 1. DADOS SEGUROS (CONSTRUÇÃO MANUAL) ---
+    const allIngredients = [
+        {% for ing in ingredients %}
+        {
+            id: {{ ing.id }},
+            // Tratamento para aspas simples e duplas para não quebrar o JS
+            name: `{{ ing.name | replace("'", "") | replace('"', '') }}`, 
+            category_id: {{ ing.category_id if ing.category_id else 'null' }},
+            unit_id: {{ ing.unit_id if ing.unit_id else 'null' }},
+            usage_unit_id: {{ ing.usage_unit_id if ing.usage_unit_id else 'null' }},
+            cost: {{ ing.cost or 0 }},
+            current: {{ ing.current }},
+            min: {{ ing.min }},
+            max: {{ ing.max }},
+            integration_code: "{{ ing.integration_code or '' }}",
+            expiration_date: "{{ ing.expiration_date or '' }}",
+            conversion_factor: {{ ing.conversion_factor or 1.0 }},
+            is_available_for_sale: {{ 'true' if ing.is_available_for_sale else 'false' }}
+        },
+        {% endfor %}
+    ];
+
+    const inventoryCategoriesData = {{ categories | tojson }};
+    const inventoryUnitsData = {{ units | tojson }};
+    const selectOptions = {{ all_ingredients_json | tojson }}; 
+    let pendingItems = [], pendingFinancialItems = null, currentInvoiceKey = null;
+
+    // --- INICIALIZAÇÃO ---
+    window.addEventListener('load', () => {
+        // Inicializa Select2
+
+        if(document.getElementById('chkOnlyRecipes')) {
+            filterRecipeList();
+        }
+
+        $('#recChildId').select2({
+            placeholder: "Selecione um Insumo...",
+            data: selectOptions.map(i => ({id: i.id, text: i.name})),
+            width: '100%',
+            dropdownParent: $('#recipeEditor')
+                         
+        });
+
+        // Evento de Conversão de Unidade
+        $('#recChildId').on('select2:select', function (e) {
+            const selectedId = e.params.data.id;
+            const ing = selectOptions.find(i => i.id == selectedId);
+            if(ing) {
+                document.getElementById('recUnitLabel').innerText = ing.usage_unit || ing.unit;
+            }
+        });
+        
+        document.getElementById('finDueDate').valueAsDate = new Date();
+    });
+
+    function switchTab(tab) {
+        document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(`btn-${tab}`).classList.add('active');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        if(tab === 'invoices') loadBills();
+    }
+
+    // --- FILTRO AJAX LIKE (INSTANTÂNEO) ---
+    function filterTable() {
+        const normalize = str => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        
+        const term = normalize(document.getElementById('searchStock').value);
+        const cat = document.getElementById('filterCategory').value;
+        const stat = document.getElementById('filterStatus').value;
+        
+        const today = new Date(); // Data de hoje
+
+        document.querySelectorAll('.stock-row').forEach(row => {
+            const name = normalize(row.dataset.name || "");
+            const rowCat = row.dataset.catid; 
+            const rowStat = row.dataset.status;
+            const expiryDateStr = row.dataset.expiry; // Pega a data (YYYY-MM-DD)
+            
+            const matchName = name.includes(term);
+            const matchCat = (cat === 'all' || rowCat === cat);
+            
+            let matchStat = false;
+
+            if (stat === 'all') {
+                matchStat = true;
+            } else if (stat === 'expiring') {
+                // Lógica de Vencimento
+                if (expiryDateStr) {
+                    const expDate = new Date(expiryDateStr);
+                    // Diferença em milissegundos convertida para dias
+                    const diffTime = expDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    // Mostra se já venceu ou vence em até 7 dias
+                    if (diffDays <= 7) matchStat = true;
+                }
+            } else {
+                matchStat = (rowStat === stat);
+            }
+            
+            if (matchName && matchCat && matchStat) row.classList.remove('hidden'); 
+            else row.classList.add('hidden');
+        });
+    }
+
+    // --- CRUD INGREDIENTES (BLINDADO) ---
+    const modal = document.getElementById('ingModal'); const content = document.getElementById('ingContent');
+    
+    function openIngModal() { 
+        document.getElementById('ingForm').reset(); document.getElementById('ingId').value=''; document.getElementById('ingTitle').innerText='Novo Ingrediente'; 
+        modal.classList.remove('hidden'); setTimeout(() => { content.classList.remove('scale-95','opacity-0'); content.classList.add('scale-100','opacity-100'); }, 10); 
+    }
+
+    function editIng(id) { 
+        // Força ID para número para garantir o match
+        const data = allIngredients.find(i => i.id === parseInt(id));
+        
+        if(!data) {
+            console.error("Item não encontrado no array JS:", id);
+            return Swal.fire('Erro', 'Erro interno: Item não carregado.', 'error');
+        }
+        
+        // Debug para você ver no console se os dados estão vindo
+        console.log("Editando:", data);
+
+        document.getElementById('ingId').value = data.id;
+        document.getElementById('ingName').value = data.name;
+        document.getElementById('ingCode').value = data.integration_code || '';
+        document.getElementById('ingCost').value = data.cost;
+        document.getElementById('ingStock').value = data.current;
+        document.getElementById('ingMin').value = data.min;
+        document.getElementById('ingMax').value = data.max;
+        document.getElementById('ingExpiry').value = data.expiration_date;
+        document.getElementById('ingFactor').value = data.conversion_factor;
+
+        // Lógica segura para Selects (Se for null, define string vazia para resetar)
+        // O JQuery/Select2 as vezes precisa de um trigger change se estiver sendo usado
+        const setSelect = (id, val) => {
+            const el = document.getElementById(id);
+            if(el) el.value = val ? val : "";
+        };
+
+        setSelect('ingCategory', data.category_id);
+        setSelect('ingUnit', data.unit_id);
+        setSelect('ingUsageUnit', data.usage_unit_id);
+
+        const chk = document.getElementById('ingAvailable'); 
+        if (chk) chk.checked = data.is_available_for_sale;
+
+        document.getElementById('ingTitle').innerText = 'Editar: ' + data.name;
+        
+        modal.classList.remove('hidden'); 
+        setTimeout(() => { 
+            content.classList.remove('scale-95','opacity-0'); 
+            content.classList.add('scale-100','opacity-100'); 
+        }, 10); 
+    }
+
+    function closeIngModal() { content.classList.remove('scale-100','opacity-100'); content.classList.add('scale-95','opacity-0'); setTimeout(() => { modal.classList.add('hidden'); },200); }
+    async function submitIng(e) { e.preventDefault(); const fd=new FormData(e.target); if(!fd.get('ing_id')) fd.delete('ing_id'); const chk = document.getElementById('ingAvailable'); if(chk && !chk.checked) fd.set('is_available_for_sale', 'False'); else fd.set('is_available_for_sale', 'True'); await fetch('/admin/inventory/ingredient/save', {method:'POST', body:fd}); location.reload(); }
+    async function deleteIng(id) { if(confirm('Excluir item?')) { await fetch(`/admin/inventory/ingredient/${id}`, {method:'DELETE'}); location.reload(); } }
+
+    // --- RECEITAS ---
+    function filterRecipeList() {
+    // Normaliza texto para busca (remove acentos)
+        const normalize = str => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        
+        const term = normalize(document.getElementById('searchRecipe').value);
+        const onlyRecipes = document.getElementById('chkOnlyRecipes').checked;
+        
+        // Termos que identificam uma receita (pode adicionar mais)
+        const recipeKeywords = ["receita", "producao", "produção", "molho", "massa", "recheio"];
+
+        document.querySelectorAll('.recipe-item-row').forEach(row => {
+            const name = normalize(row.dataset.name || "");
+            const category = normalize(row.dataset.category || "");
+            
+            let visible = true;
+
+            // 1. Filtro de Texto
+            if (term && !name.includes(term)) visible = false;
+
+            // 2. Filtro de Categoria "Inteligente"
+            if (onlyRecipes && visible) {
+                // Verifica se a categoria contém palavras chave OU se o nome do item sugere que é receita
+                const isRecipeCategory = recipeKeywords.some(k => category.includes(k));
+                if (!isRecipeCategory) visible = false;
+            }
+
+            if(visible) row.classList.remove('hidden'); 
+            else row.classList.add('hidden');
+        });
+    }
+
+    function openRecipeManager(id, name) {
+        document.getElementById('recParentId').value = id;
+        document.getElementById('lblRecipeName').innerText = name;
+        document.getElementById('recipeEmptyState').classList.add('hidden');
+        document.getElementById('recipeEditor').classList.remove('hidden');
+        
+        // Configura modal de produção
+        document.getElementById('prodTargetId').value = id;
+        document.getElementById('prodTargetName').value = name;
+        
+        renderRecipeList(id);
+    }
+
+    async function renderRecipeList(parentId) {
+        const tbody = document.getElementById('recipeItemsList');
+        tbody.innerHTML = '<tr><td colspan="3"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+        const res = await fetch(`/admin/inventory/ingredient/${parentId}/recipe`);
+        const data = await res.json();
+        tbody.innerHTML = '';
+        if(data.length === 0) tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-slate-500 italic text-xs">Vazio. Adicione insumos.</td></tr>';
+        else data.forEach(item => {
+            tbody.innerHTML += `<tr class="border-b border-slate-700/50 hover:bg-slate-700/30"><td class="p-3 font-bold text-slate-300 pl-4">${item.child_name}</td><td class="p-3 text-right font-mono text-green-400">${item.qty} ${item.unit}</td><td class="p-3 text-right pr-4"><button onclick="deleteRecipeItem(${item.id}, ${parentId})" class="text-red-400 hover:text-white transition"><i class="fas fa-trash"></i></button></td></tr>`;
+        });
+    }
+
+    async function addIngredientToRecipe(e) {
+        e.preventDefault();
+        const parentId = document.getElementById('recParentId').value;
+        const childId = $('#recChildId').val();
+        const qty = document.getElementById('recQty').value;
+
+        if(!childId || !qty) return Swal.fire('Atenção', 'Selecione o insumo e a quantidade.', 'warning');
+        
+        // Proteção Frontend básica
+        if(parentId == childId) return Swal.fire('Erro', 'Não pode adicionar o item a ele mesmo.', 'error');
+
+        const fd = new FormData(); 
+        fd.append('parent_id', parentId); 
+        fd.append('child_id', childId); 
+        fd.append('quantity', qty);
+
+        const res = await fetch('/admin/inventory/recipe/save', {method:'POST', body:fd});
+        
+        if(res.ok) {
+            $('#recChildId').val(null).trigger('change'); 
+            document.getElementById('recQty').value = '';
+            renderRecipeList(parentId);
+            const Toast = Swal.mixin({toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar:true}); 
+            Toast.fire({icon: 'success', title: 'Adicionado!'});
+        } else {
+            const err = await res.json(); 
+            Swal.fire('Erro', err.message || 'Falha ao salvar.', 'error');
+        }
+    }
+
+    async function deleteRecipeItem(itemId, parentId) {
+        if(!confirm('Remover?')) return;
+        await fetch(`/admin/inventory/recipe-item/${itemId}`, {method:'DELETE'});
+        renderRecipeList(parentId);
+    }
+
+    function openProductionModalFromEditor() {
+        document.getElementById('prodQuantity').value = '';
+        document.getElementById('productionModal').classList.remove('hidden');
+    }
+    function closeProdModal() { document.getElementById('productionModal').classList.add('hidden'); }
+    
+    async function confirmProduction() {
+        const id = document.getElementById('prodTargetId').value;
+        const qty = document.getElementById('prodQuantity').value;
+        if(!qty || qty<=0) return Swal.fire('Erro', 'Qtd inválida', 'warning');
+        
+        const res = await fetch('/admin/inventory/produce', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ingredient_id:id, quantity_to_produce:parseFloat(qty)})});
+        const data = await res.json();
+        if(res.ok) Swal.fire('Produzido!', data.message, 'success').then(()=>location.reload());
+        else Swal.fire('Erro', data.message, 'error');
+    }
+
+    // --- NOTAS FISCAIS ---
+    function startInvoiceUpload(input) {
+        if(!input.files[0]) return;
+        const file = input.files[0];
+        const fd = new FormData(); fd.append('file', file);
+        Swal.fire({title:'Lendo Nota...', didOpen:()=>Swal.showLoading()});
+        
+        fetch('/admin/stock/upload-invoice', {method:'POST', body:fd})
+            .then(res => res.json())
+            .then(data => {
+                Swal.close();
+                if(data.data) {
+                    pendingFinancialItems = data.data.items;
+                    currentInvoiceKey = data.invoice_key;
+                    document.getElementById('finTotalValue').value = data.data.total_value || 0.00;
+                    document.getElementById('financialUploadModal').classList.remove('hidden');
+                } else Swal.fire('Erro', 'Leitura falhou.', 'error');
+            });
+        input.value = '';
+    }
+
+    function proceedToMatcher() {
+        window.financialData = {
+            payment_method: document.getElementById('finPaymentMethod').value,
+            due_date: document.getElementById('finDueDate').value,
+            is_paid: document.getElementById('finIsPaid').checked,
+            total_value: parseFloat(document.getElementById('finTotalValue').value || 0)
+        };
+        document.getElementById('financialUploadModal').classList.add('hidden');
+        openMatcher(pendingFinancialItems);
+    }
+
+    function openMatcher(items) { 
+        pendingItems=items; const list=document.getElementById('matcherList'); list.innerHTML=''; 
+        items.forEach((item,idx)=>{ 
+            const match=allIngredients.find(ing=>(item.code&&ing.code===item.code)||ing.name.toLowerCase().includes(item.name.toLowerCase())); 
+            let opts='<option value="">➕ Novo</option>'; 
+            allIngredients.forEach(ing=>{ opts+=`<option value="${ing.id}" ${match&&match.id===ing.id?'selected':''}>🔗 ${ing.name}</option>`; }); 
+            list.innerHTML+=`<tr><td class="text-white text-sm">${item.name}</td><td class="text-slate-500 text-xs">${item.code}</td><td class="text-green-400 text-xs">${item.qty} ${item.unit}</td><td class="text-center"><input type="checkbox" id="resale-${idx}" class="w-4 h-4 bg-slate-900 border-slate-600"></td><td><select id="match-${idx}" class="select2-init w-full">${opts}</select></td></tr>`; 
+        }); 
+        document.getElementById('matcherModal').classList.remove('hidden'); 
+        $('.select2-init').select2({dropdownParent:$('#matcherModal'), width:'100%'}); 
+    }
+    function closeMatcher() { document.getElementById('matcherModal').classList.add('hidden'); }
+
+    async function confirmEntry() { 
+        // Prepara os dados
+        const payloadItems = pendingItems.map((item,idx)=>({
+            name_in_invoice:item.name, 
+            mapped_id:$(`#match-${idx}`).val() || null, 
+            qty:item.qty, 
+            cost: (item.total_price && item.qty > 0) ? (item.total_price/item.qty) : 0, 
+            unit:item.unit, 
+            code:item.code, 
+            is_resale:document.getElementById(`resale-${idx}`).checked
+        }));
+
+        const finalPayload = { items: payloadItems, invoice_key: currentInvoiceKey, ...window.financialData };
+        
+        // Feedback visual
+        const btn = event.target; // Pega o botão clicado
+        const oldText = btn.innerText;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Salvando...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/admin/inventory/process-invoice-items-financial',{
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify(finalPayload)
+            }); 
+            
+            const data = await res.json();
+            
+            if (res.ok) {
+                Swal.fire({
+                    icon: 'success', 
+                    title: 'Importação Concluída!', 
+                    text: data.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => location.reload());
+            } else {
+                Swal.fire('Erro', data.message || 'Erro ao processar nota.', 'error');
+                btn.innerHTML = oldText;
+                btn.disabled = false;
+            }
+        } catch (e) {
+            console.error(e);
+            Swal.fire('Erro', 'Falha de conexão com o servidor.', 'error');
+            btn.innerHTML = oldText;
+            btn.disabled = false;
+        }
+    }
+
+    async function loadBills() {
+        const tbody = document.getElementById('billsList');
+        const statusFilter = document.getElementById('billFilterStatus').value;
+        const totalDisplay = document.getElementById('billsTotalDisplay');
+        
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8"><i class="fas fa-spinner fa-spin text-slate-500"></i></td></tr>';
+        
+        try {
+            const res = await fetch(`/admin/finance/bills?status=${statusFilter}`);
+            const bills = await res.json();
+            
+            tbody.innerHTML = '';
+            let totalSum = 0;
+
+            if (bills.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500 italic">Nenhuma conta encontrada neste filtro.</td></tr>';
+                totalDisplay.innerText = 'R$ 0.00';
+                return;
+            }
+
+            bills.forEach(b => {
+                const isPaid = !!b.paid_at;
+                totalSum += b.amount;
+                
+                // Formatação
+                const dueDate = new Date(b.due_date).toLocaleDateString('pt-BR');
+                const isoDate = b.due_date.split('T')[0]; // Para preencher o input type="date"
+                const paidDate = isPaid ? new Date(b.paid_at).toLocaleDateString('pt-BR') : '-';
+                
+                // Objeto de dados para edição (stringificado)
+                const billData = JSON.stringify({
+                    id: b.id, desc: b.description, amount: b.amount, 
+                    date: isoDate, method: b.payment_method
+                }).replace(/"/g, '&quot;');
+
+                // Badges e Botões
+                const statusBadge = isPaid 
+                    ? `<span class="bg-green-900/30 text-green-400 text-[10px] font-bold px-2 py-1 rounded border border-green-500/30">PAGO ${paidDate}</span>` 
+                    : `<span class="bg-red-900/30 text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-500/30">PENDENTE</span>`;
+
+                let actionBtn = '';
+                if (isPaid) {
+                    actionBtn = `<button onclick="reverseBill(${b.id})" class="text-orange-400 hover:text-white border border-orange-500/30 hover:bg-orange-500/20 px-2 py-1 rounded text-xs transition mr-2" title="Estornar"><i class="fas fa-undo"></i></button>`;
+                } else {
+                    actionBtn = `<button onclick="payBill(${b.id})" class="bg-green-600 hover:bg-green-500 text-white px-2 py-1 rounded text-xs font-bold shadow transition mr-2" title="Pagar"><i class="fas fa-check"></i></button>`;
+                }
+
+                // Botões de Gestão (Editar / Excluir)
+                const manageBtns = `
+                    <button onclick="openBillModal(${billData})" class="text-blue-400 hover:text-white hover:bg-blue-900/30 p-1.5 rounded transition"><i class="fas fa-edit"></i></button>
+                    <button onclick="deleteBill(${b.id})" class="text-red-400 hover:text-white hover:bg-red-900/30 p-1.5 rounded transition"><i class="fas fa-trash"></i></button>
+                `;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/50 group">
+                        <td class="px-6 py-4 font-mono ${!isPaid && new Date(b.due_date) < new Date() ? 'text-red-400 font-bold' : ''}">${dueDate}</td>
+                        <td class="px-6 py-4">
+                            <div class="text-white font-medium">${b.description}</div>
+                            ${b.invoice_key ? `<div class="text-[10px] text-slate-500 font-mono truncate w-32">NFe: ${b.invoice_key}</div>` : ''}
+                        </td>
+                        <td class="px-6 py-4 font-mono font-bold text-white">R$ ${b.amount.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-xs text-slate-400">${b.payment_method}</td>
+                        <td class="px-6 py-4 text-center">${statusBadge}</td>
+                        <td class="px-6 py-4 text-right flex justify-end items-center gap-1">
+                            ${actionBtn}
+                            <div class="h-4 w-px bg-slate-700 mx-1"></div>
+                            ${manageBtns}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            totalDisplay.innerText = `R$ ${totalSum.toFixed(2)}`;
+
+        } catch (e) {
+            console.error(e);
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-400">Erro ao carregar contas.</td></tr>';
+        }
+    }
+
+    async function payBill(id) {
+        if(!confirm('Confirmar pagamento desta conta?')) return;
+        
+        try {
+            const res = await fetch(`/admin/finance/bills/${id}/pay`, {method: 'POST'});
+            const data = await res.json();
+            
+            if(res.ok) {
+                Swal.fire({icon: 'success', title: 'Pago!', text: 'Conta baixada com sucesso.', timer: 1500, showConfirmButton: false});
+                loadBills(); // Recarrega a lista
+            } else {
+                Swal.fire('Erro', data.message, 'error');
+            }
+        } catch (e) {
+            Swal.fire('Erro', 'Falha de conexão', 'error');
+        }
+    }
+
+    async function reverseBill(id) {
+        const result = await Swal.fire({
+            title: 'Estornar Pagamento?',
+            text: "A conta voltará a ficar Pendente.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#f59e0b',
+            cancelButtonColor: '#334155',
+            confirmButtonText: 'Sim, estornar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch(`/admin/finance/bills/${id}/reverse`, {method: 'POST'});
+                const data = await res.json();
+                
+                if(res.ok) {
+                    Swal.fire({icon: 'success', title: 'Estornado!', timer: 1500, showConfirmButton: false});
+                    loadBills();
+                } else {
+                    Swal.fire('Erro', data.message, 'error');
+                }
+            } catch (e) {
+                Swal.fire('Erro', 'Falha de conexão', 'error');
+            }
+        }
+    }
+    
+    // RESTAURADOS: FUNÇÕES DE RELATÓRIO E PREVISÃO
+    async function loadConsumptionReport() {
+        let start = document.getElementById('reportStart').value; let end = document.getElementById('reportEnd').value;
+        const res = await fetch('/admin/inventory/reports/consumption', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({start,end})});
+        const json = await res.json(); renderTable(json.data);
+    }
+    function renderTable(data) {
+        const b = document.getElementById('consumptionList'); 
+        b.innerHTML=''; 
+        
+        if(!data || data.length === 0) { 
+            b.innerHTML='<tr><td colspan="4" class="py-8 text-center text-slate-500 italic">Sem dados para o período.</td></tr>'; 
+            return; 
+        }
+
+        data.forEach(i => {
+            const row = document.createElement('tr');
+            row.className = "hover:bg-slate-800 border-b border-slate-700/30 transition";
+            
+            row.innerHTML = `
+                <td class="px-6 py-4">
+                    <div class="font-bold text-white text-sm">${i.name}</div>
+                </td>
+                <td class="px-6 py-4">
+                    <span class="text-xs text-slate-400 bg-slate-900 border border-slate-700 px-2 py-1 rounded">${i.category}</span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <span class="font-mono text-slate-200 text-sm">${i.qty.toFixed(2)} ${i.unit}</span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <span class="font-mono text-green-400 font-bold text-sm">R$ ${i.cost.toFixed(2)}</span>
+                </td>
+            `;
+            b.appendChild(row);
+        });
+    }
+    async function generateForecast() {
+        const btn=document.querySelector('button[onclick="generateForecast()"]'); btn.innerHTML='...'; btn.disabled=true;
+        const start = document.getElementById('forecastStart').value; const end = document.getElementById('forecastEnd').value; const days = document.getElementById('forecastDays').value;
+        const res = await fetch('/admin/inventory/reports/forecast', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({analysis_start: start, analysis_end: end, days_to_cover: parseInt(days)})});
+        const data = await res.json();
+        const tbody = document.getElementById('forecastTableBody'); tbody.innerHTML = '';
+        let grandTotal = 0;
+        if(data.shopping_list && data.shopping_list.length>0) {
+            data.shopping_list.forEach(item => {
+                grandTotal += item.total_cost;
+                tbody.innerHTML += `<tr class="hover:bg-slate-700/30 border-b border-slate-700/50"><td class="px-4 py-3 text-center"><input type="checkbox" class="w-4 h-4 rounded bg-slate-800 border-slate-500"></td><td class="px-4 py-3 font-bold text-white">${item.name}</td><td class="px-4 py-3 text-right font-mono text-yellow-400 text-base">${item.qty_buy} <span class="text-xs text-slate-500">${item.unit}</span></td><td class="px-4 py-3 text-right text-xs text-slate-400">R$ ${item.unit_price.toFixed(2)}</td><td class="px-4 py-3 text-right font-bold text-green-400">R$ ${item.total_cost.toFixed(2)}</td></tr>`;
+            });
+        } else tbody.innerHTML='<tr><td colspan="5" class="p-6 text-center text-slate-500 italic">Estoque suficiente.</td></tr>';
+        document.getElementById('forecastTotal').innerText = `R$ ${grandTotal.toFixed(2)}`;
+        if(data.predicted_products) {
+            const top = Object.entries(data.predicted_products).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>`<span class="bg-indigo-900/40 border border-indigo-500/30 px-3 py-1 rounded-full text-xs text-indigo-200 font-bold shadow-sm">${v}x ${k}</span>`).join(' ');
+            document.getElementById('forecastProds').innerHTML = top;
+        }
+        document.getElementById('forecastResult').classList.remove('hidden');
+        btn.innerHTML='Gerar'; btn.disabled=false;
+    }
+    function copyForecast() { 
+        let text = "🛒 *LISTA DE COMPRAS*\n\n";
+        document.querySelectorAll('#forecastTableBody tr').forEach(tr => { if(tr.children.length > 3) text += `- [ ] ${tr.children[2].innerText} ${tr.children[1].innerText}\n`; });
+        navigator.clipboard.writeText(text); alert('Copiado!'); 
+    }
+
+    // --- LÓGICA DA ABA DE TRANSAÇÕES ---
+
+    // 1. Inicializa o Select2 ao carregar a página (ou ao clicar na aba)
+    $(document).ready(function() {
+        $('#transIngSelect').select2({
+            placeholder: "Buscar item...",
+            data: selectOptions.map(i => ({id: i.id, text: i.name, unit: i.unit})),
+            width: '100%'
+        });
+
+        // Atualiza a unidade visualmente quando troca o item
+        $('#transIngSelect').on('select2:select', function (e) {
+            const data = e.params.data;
+            if(data.unit) document.getElementById('transUnitLabel').innerText = data.unit;
+        });
+        
+        // Carrega histórico inicial
+        loadTransactionHistory();
+    });
+
+    // 2. Função de Envio
+    async function submitTransaction(e) {
+        e.preventDefault();
+        
+        const ingId = $('#transIngSelect').val();
+        const type = document.querySelector('input[name="transType"]:checked').value;
+        const qty = parseFloat(document.getElementById('transQty').value);
+        const reason = document.getElementById('transReason').value;
+
+        if(!ingId || isNaN(qty) || qty <= 0) {
+            return Swal.fire('Atenção', 'Selecione o item e uma quantidade válida.', 'warning');
+        }
+
+        const payload = {
+            ingredient_id: parseInt(ingId),
+            type: type,
+            quantity: qty,
+            reason: reason
+        };
+
+        try {
+            const res = await fetch('/admin/inventory/transaction', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success', 
+                    title: 'Registrado!', 
+                    text: `Novo estoque: ${data.new_stock}`,
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                
+                // Limpa form
+                document.getElementById('transQty').value = '';
+                document.getElementById('transReason').value = '';
+                
+                // Atualiza tabelas
+                loadTransactionHistory();
+                
+                // Opcional: Recarregar a página para atualizar a tabela principal ou atualizar via JS
+                // location.reload(); 
+            } else {
+                Swal.fire('Erro', data.message || 'Erro ao salvar', 'error');
+            }
+        } catch (err) {
+            Swal.fire('Erro', 'Conexão falhou', 'error');
+        }
+    }
+
+    // 3. Carregar Histórico
+    async function loadTransactionHistory() {
+        const tbody = document.getElementById('transHistoryList');
+        try {
+            const res = await fetch('/admin/inventory/transactions');
+            const logs = await res.json();
+            
+            tbody.innerHTML = '';
+            
+            if(logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500 italic">Nenhuma movimentação recente.</td></tr>';
+                return;
+            }
+
+            logs.forEach(l => {
+                let typeHtml = '';
+                let qtyClass = '';
+                
+                if(l.type === 'IN') {
+                    typeHtml = '<span class="text-[10px] bg-green-900/30 text-green-400 px-2 py-0.5 rounded font-bold">ENTRADA</span>';
+                    qtyClass = 'text-green-400';
+                } else if (l.type === 'OUT') {
+                    typeHtml = '<span class="text-[10px] bg-red-900/30 text-red-400 px-2 py-0.5 rounded font-bold">SAÍDA</span>';
+                    qtyClass = 'text-red-400';
+                } else {
+                    typeHtml = '<span class="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded font-bold">BALANÇO</span>';
+                    qtyClass = 'text-blue-400';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 border-b border-slate-700/50 transition">
+                        <td class="px-4 py-3 font-mono text-xs text-slate-400">${l.date}</td>
+                        <td class="px-4 py-3 font-bold text-white">${l.item}</td>
+                        <td class="px-4 py-3">${typeHtml}</td>
+                        <td class="px-4 py-3 text-right font-mono ${qtyClass}">${l.qty}</td>
+                        <td class="px-4 py-3 text-xs text-slate-400 truncate max-w-[150px]" title="${l.reason}">${l.reason}</td>
+                    </tr>
+                `;
+            });
+
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-red-400">Erro ao carregar histórico.</td></tr>';
+        }
+    }
+
+    // --- FUNÇÃO PARA O CARD DE REPOSIÇÃO ---
+    function showCriticalItems() {
+        // 1. Muda para a aba de Gerenciamento
+        switchTab('manage');
+        
+        // 2. Define o select de status para "Baixo" (low)
+        const statusSelect = document.getElementById('filterStatus');
+        if(statusSelect) {
+            statusSelect.value = 'low';
+            
+            // 3. Opcional: Reseta outros filtros para não confundir
+            document.getElementById('searchStock').value = '';
+            document.getElementById('filterCategory').value = 'all';
+            
+            // 4. Aplica o filtro na tabela
+            filterTable();
+        }
+    }
+
+    // --- FUNÇÃO DO CARD VENCENDO ---
+    function showExpiringItems() {
+        switchTab('manage');
+        const statusSelect = document.getElementById('filterStatus');
+        
+        if(statusSelect) {
+            statusSelect.value = 'expiring'; // Seleciona a nova opção
+            
+            // Limpa outros filtros
+            document.getElementById('searchStock').value = '';
+            document.getElementById('filterCategory').value = 'all';
+            
+            filterTable();
+        }
+    }
+
+// --- FUNÇÕES DE CRUD DE CONTAS ---
+
+    function openBillModal(data = null) {
+        if (data) {
+            // Modo Edição
+            document.getElementById('billId').value = data.id;
+            document.getElementById('billDesc').value = data.desc;
+            document.getElementById('billAmount').value = data.amount;
+            document.getElementById('billDate').value = data.date;
+            document.getElementById('billMethod').value = data.method;
+            document.getElementById('billModalTitle').innerText = "Editar Conta";
+        } else {
+            // Modo Criação
+            document.getElementById('billId').value = '';
+            document.getElementById('billDesc').value = '';
+            document.getElementById('billAmount').value = '';
+            document.getElementById('billDate').value = new Date().toISOString().split('T')[0]; // Hoje
+            document.getElementById('billModalTitle').innerText = "Nova Conta Manual";
+        }
+        document.getElementById('billModal').classList.remove('hidden');
+    }
+
+    function closeBillModal() {
+        document.getElementById('billModal').classList.add('hidden');
+    }
+
+    async function submitBill(e) {
+        e.preventDefault();
+        
+        const fd = new FormData();
+        const id = document.getElementById('billId').value;
+        if(id) fd.append('bill_id', id);
+        
+        fd.append('description', document.getElementById('billDesc').value);
+        fd.append('amount', document.getElementById('billAmount').value);
+        fd.append('due_date', document.getElementById('billDate').value);
+        fd.append('payment_method', document.getElementById('billMethod').value);
+
+        try {
+            const res = await fetch('/admin/finance/bills/save', {method:'POST', body:fd});
+            const data = await res.json();
+            
+            if(res.ok) {
+                Swal.fire({icon: 'success', title: 'Salvo!', timer: 1000, showConfirmButton: false});
+                closeBillModal();
+                loadBills();
+            } else {
+                Swal.fire('Erro', data.message, 'error');
+            }
+        } catch (e) {
+            Swal.fire('Erro', 'Conexão falhou', 'error');
+        }
+    }
+
+    async function deleteBill(id) {
+        if(!confirm('Tem certeza que deseja excluir este lançamento?')) return;
+        
+        try {
+            const res = await fetch(`/admin/finance/bills/${id}`, {method: 'DELETE'});
+            if(res.ok) {
+                Swal.fire({icon: 'success', title: 'Excluído', timer: 1000, showConfirmButton: false});
+                loadBills();
+            } else {
+                Swal.fire('Erro', 'Falha ao excluir', 'error');
+            }
+        } catch(e) {
+            Swal.fire('Erro', 'Conexão falhou', 'error');
+        }
+    }
+
+</script>
+{% endblock %}

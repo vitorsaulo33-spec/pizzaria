@@ -1,0 +1,25 @@
+<div id="catManagerModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeManagerModal()"></div>
+    <div class="relative w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 flex flex-col max-h-[80vh] transform transition-all scale-95 opacity-0" id="catManagerContent">
+        
+        <div class="p-5 border-b border-slate-700 bg-slate-900/50 rounded-t-2xl flex justify-between items-center">
+            <h3 class="text-lg font-bold text-white">Gerenciar ...</h3>
+            <button onclick="closeManagerModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="p-4 border-b border-slate-700/50 bg-slate-800">
+            <form onsubmit="submitManagerItem(event)" class="flex gap-2">
+                <input type="hidden" id="catManId">
+                <input type="text" id="catManName" required class="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-white outline-none focus:border-indigo-500 text-sm" placeholder="Novo item...">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded font-bold text-sm shadow transition">Salvar</button>
+            </form>
+        </div>
+
+        <div class="overflow-y-auto p-2 flex-1 bg-slate-800/50">
+            <table class="w-full text-sm text-left">
+                <tbody id="catManagerList" class="divide-y divide-slate-700/30">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>

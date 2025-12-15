@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Clientes - ALIV{% endblock %}
+
+{% block content %}
+    
+    <div class="flex flex-col xl:flex-row justify-between items-end mb-6 bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg gap-4">
+        <div class="w-full xl:w-auto">
+            <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                <i class="fas fa-address-book text-pink-500"></i> Base de Clientes
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">Gerencie seus contatos e fidelize os melhores.</p>
+        </div>
+        
+        <form method="get" class="w-full xl:w-auto flex flex-wrap gap-2 items-end bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+            
+            <div class="flex-1 min-w-[110px]">
+                <label class="text-[10px] text-slate-500 font-bold uppercase pl-1">De (Data)</label>
+                <input type="date" name="start_date" value="{{ filters.start }}" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-xs focus:border-pink-500 outline-none text-white">
+            </div>
+
+            <div class="flex-1 min-w-[110px]">
+                <label class="text-[10px] text-slate-500 font-bold uppercase pl-1">Até (Data)</label>
+                <input type="date" name="end_date" value="{{ filters.end }}" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-xs focus:border-pink-500 outline-none text-white">
+            </div>
+            
+            <div class="flex-1 min-w-[130px]">
+                <label class="text-[10px] text-slate-500 font-bold uppercase pl-1">Status (RFM)</label>
+                <select name="segment" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-xs focus:border-pink-500 outline-none text-white">
+                    <option value="Todos" {% if filters.segment == 'Todos' %}selected{% endif %}>Todos</option>
+                    <option value="Debito" {% if filters.segment == 'Debito' %}selected{% endif %} class="font-bold text-red-400">⚠️ Com Débito (Fiado)</option>
+                    <option value="Campeão" {% if 'Campeão' in filters.segment %}selected{% endif %}>💎 Campeões</option>
+                    <option value="Leal" {% if 'Leal' in filters.segment %}selected{% endif %}>🚀 Leais</option>
+                    <option value="Promissor" {% if 'Promissor' in filters.segment %}selected{% endif %}>✅ Promissores</option>
+                    <option value="Risco" {% if 'Risco' in filters.segment %}selected{% endif %}>⚠️ Em Risco</option>
+                    <option value="Novato" {% if 'Novato' in filters.segment %}selected{% endif %}>👶 Novatos</option>
+                    <option value="Hibernando" {% if 'Hibernando' in filters.segment %}selected{% endif %}>💤 Hibernando</option>
+                </select>
+            </div>
+
+            <div class="flex-1 min-w-[150px]">
+                <label class="text-[10px] text-slate-500 font-bold uppercase pl-1">Busca</label>
+                <input type="text" name="search" value="{{ filters.search }}" placeholder="Nome, Telefone..." class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-xs focus:border-pink-500 outline-none text-white placeholder-slate-500">
+            </div>
+            
+            <div class="flex gap-2">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition h-[34px] flex items-center gap-2" title="Filtrar">
+                    <i class="fas fa-filter"></i>
+                </button>
+                <button type="button" onclick="openModal()" class="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition h-[34px] flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Novo
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-700">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-left">
+                <thead class="bg-slate-900/80 text-slate-400 uppercase text-xs font-bold border-b border-slate-700">
+                    <tr>
+                        <th class="px-6 py-4">Cliente & Status</th>
+                        <th class="px-6 py-4">Contato</th>
+                        <th class="px-6 py-4">LTV (Total Gasto)</th>
+                        <th class="px-6 py-4">Última Compra</th>
+                        <th class="px-6 py-4">Localização (Última)</th>
+                        <th class="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/50">
+                    {% for cust in customers %}
+                    <tr class="hover:bg-slate-700/30 transition group">
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-white text-base flex flex-col gap-1">
+                                <span>{{ cust.name or 'Sem Nome' }}</span>
+                                <div class="flex">
+                                    {% if 'Campeão' in cust.rfm_segment %}
+                                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-purple-900/50 text-purple-400 border border-purple-500/30">💎 {{ cust.rfm_segment }}</span>
+                                    {% elif 'Risco' in cust.rfm_segment %}
+                                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-900/50 text-red-400 border border-red-500/30 animate-pulse">⚠️ {{ cust.rfm_segment }}</span>
+                                    {% elif 'Leal' in cust.rfm_segment %}
+                                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-green-900/50 text-green-400 border border-green-500/30">🚀 {{ cust.rfm_segment }}</span>
+                                    {% else %}
+                                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-700 text-slate-400 border border-slate-600">{{ cust.rfm_segment }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if cust.birth_date_iso %}
+                            <div class="text-xs text-pink-400 flex items-center gap-1 mt-1">
+                                <i class="fas fa-birthday-cake"></i> Aniv: {{ cust.birth_date_iso }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="px-6 py-4">
+                            <div class="flex flex-col gap-1">
+                                <div class="text-slate-300 flex items-center gap-2 font-mono text-xs">
+                                    <i class="fab fa-whatsapp text-green-500"></i> {{ cust.phone }}
+                                </div>
+                                <div class="text-slate-500 text-xs truncate max-w-[150px]" title="{{ cust.email }}">{{ cust.email }}</div>
+                            </div>
+                        </td>
+
+                        <td class="px-6 py-4">
+                            <div class="font-mono font-bold text-emerald-400 text-base">R$ {{ "%.2f"|format(cust.total_spent) }}</div>
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-300 text-xs font-medium">{{ cust.last_order_fmt }}</td>
+
+                        <td class="px-6 py-4">
+                            {% if cust.address %}
+                                <div class="text-sm text-slate-300 font-bold">{{ cust.address.neighborhood }}</div>
+                                <div class="text-xs text-slate-500 truncate max-w-[150px]">{{ cust.address.street }}, {{ cust.address.number }}</div>
+                            {% else %}
+                                <span class="text-slate-600 text-xs italic">Sem endereço</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex justify-end items-center gap-2">
+                                <a href="https://wa.me/{{ cust.phone }}" target="_blank" 
+                                   class="px-2 py-1.5 text-green-400 hover:bg-green-500/10 rounded transition border border-transparent hover:border-green-500/30" title="Chamar no WhatsApp">
+                                    <i class="fab fa-whatsapp text-lg"></i>
+                                </a>
+
+                                <button onclick="openHistoryModal('{{ cust.id }}', '{{ cust.name }}')" 
+                                        class="px-3 py-1.5 bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded border border-indigo-500/30 transition text-xs font-bold flex items-center gap-1">
+                                    <i class="fas fa-receipt"></i> <span class="hidden md:inline">Pedidos</span>
+                                </button>
+
+                                <button onclick="openDebtModal({{ cust.id }})" 
+                                        class="px-3 py-1.5 bg-red-900/40 hover:bg-red-600 text-red-300 hover:text-white rounded border border-red-500/30 transition text-xs font-bold flex items-center gap-1" title="Ver Fiados / Dívidas">
+                                    <i class="fas fa-book-dead"></i> <span class="hidden md:inline">Fiado</span>
+                                </button>
+                                
+                                <button onclick='editCustomer({{ cust | tojson }})' class="p-2 text-blue-400 hover:bg-blue-500/10 rounded" title="Editar"><i class="fas fa-edit"></i></button>
+                                <button onclick="deleteCustomer({{ cust.id }})" class="p-2 text-red-400 hover:bg-red-500/10 rounded" title="Excluir"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+                            <i class="fas fa-users text-4xl mb-3 opacity-30"></i><br>Nenhum cliente encontrado com estes filtros.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="custModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
+        <div class="relative w-full max-w-lg bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 p-6 transform transition-all scale-95 opacity-0 overflow-y-auto max-h-[90vh]" id="modalContent">
+            
+            <h3 class="text-xl font-bold text-white mb-4" id="modalTitle">Novo Cliente</h3>
+            
+            <form id="custForm" onsubmit="submitCustomer(event)" class="space-y-4">
+                <input type="hidden" name="cust_id" id="custId">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Nome</label>
+                        <input type="text" name="name" id="custName" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Telefone</label>
+                        <input type="text" name="phone" id="custPhone" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Email</label>
+                        <input type="email" name="email" id="custEmail" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Aniversário</label>
+                        <input type="date" name="birth_date" id="custBirth" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none">
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-700 pt-4 mt-2">
+                    <p class="text-xs text-pink-400 font-bold mb-3 uppercase flex items-center gap-2"><i class="fas fa-map-marker-alt"></i> Endereço</p>
+                    
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                        <div class="col-span-1">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">CEP</label>
+                            <input type="text" name="zip_code" id="custZip" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Rua</label>
+                            <input type="text" name="street" id="custStreet" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Número</label>
+                            <input type="text" name="number" id="custNumber" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Complemento</label>
+                            <input type="text" name="complement" id="custComp" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Bairro</label>
+                            <input type="text" name="neighborhood" id="custNeighborhood" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Cidade</label>
+                            <input type="text" name="city" id="custCity" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Estado</label>
+                            <input type="text" name="state" id="custState" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t border-slate-700">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white">Cancelar</button>
+                    <button type="submit" class="px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-bold shadow-lg">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="historyModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeHistoryModal()"></div>
+        <div class="relative w-full max-w-lg bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 flex flex-col max-h-[85vh] transform transition-all scale-95 opacity-0" id="historyContent">
+            <div class="p-5 border-b border-slate-700 bg-slate-900/50 rounded-t-2xl flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2"><i class="fas fa-history text-indigo-400"></i> Histórico de Pedidos</h3>
+                    <p class="text-xs text-slate-400" id="historyClientName">Carregando...</p>
+                </div>
+                <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div class="overflow-y-auto p-4 space-y-3" id="historyList">
+                <div class="text-center py-8 text-slate-500"><i class="fas fa-circle-notch fa-spin"></i> Buscando...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="debtModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+        <div class="relative w-full max-w-lg bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 flex flex-col max-h-[90vh]">
+            
+            <div class="p-5 border-b border-slate-700 bg-slate-900 rounded-t-2xl flex justify-between items-center shrink-0">
+                <div>
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fas fa-file-invoice-dollar text-red-500"></i> Carteira de Fiado
+                    </h3>
+                    <p class="text-xs text-slate-400" id="debtClientName">Carregando...</p>
+                </div>
+                <button onclick="document.getElementById('debtModal').classList.add('hidden')" class="text-slate-400 hover:text-white p-2"><i class="fas fa-times text-lg"></i></button>
+            </div>
+
+            <div class="p-4 bg-red-900/10 border-b border-red-500/20 text-center shrink-0">
+                <span class="text-xs text-red-300 font-bold uppercase tracking-wider block mb-1">Dívida Total</span>
+                <span class="text-3xl font-black text-red-500 font-mono" id="debtTotalVal">R$ 0,00</span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll" id="debtList">
+                </div>
+
+            <div class="p-4 border-t border-slate-700 bg-slate-900 rounded-b-2xl">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs text-slate-400 font-bold uppercase">Selecionado para Pagar:</span>
+                    <span class="text-xl font-bold text-green-400 font-mono" id="selectedDebtTotal">R$ 0,00</span>
+                </div>
+                
+                <button onclick="paySelectedDebt()" id="btnPayDebt" disabled 
+                    class="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition">
+                    <i class="fas fa-check-circle"></i> QUITAR SELECIONADOS
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Lógica do Modal CRUD (Corrigida) ---
+        const modal = document.getElementById('custModal');
+        const content = document.getElementById('modalContent');
+        let SELECTED_DEBT_IDS = [];
+
+        function openModal() {
+            document.getElementById('custForm').reset();
+            document.getElementById('custId').value = '';
+            document.getElementById('modalTitle').innerText = 'Novo Cliente';
+            modal.classList.remove('hidden');
+            setTimeout(() => { content.classList.remove('scale-95', 'opacity-0'); content.classList.add('scale-100', 'opacity-100'); }, 10);
+        }
+
+        function editCustomer(data) {
+            document.getElementById('custId').value = data.id;
+            document.getElementById('custName').value = data.name;
+            document.getElementById('custPhone').value = data.phone;
+            document.getElementById('custEmail').value = data.email || '';
+            document.getElementById('custBirth').value = data.birth_date_iso || '';
+
+            // Lógica de Endereço (Corrigida)
+            if (data.address) {
+                document.getElementById('custStreet').value = data.address.street || '';
+                document.getElementById('custNumber').value = data.address.number || '';
+                document.getElementById('custNeighborhood').value = data.address.neighborhood || '';
+                document.getElementById('custCity').value = data.address.city || '';
+                document.getElementById('custZip').value = data.address.zip_code || '';
+                document.getElementById('custState').value = data.address.state || '';
+                document.getElementById('custComp').value = data.address.complement || '';
+            } else {
+                // Limpa campos de endereço
+                document.getElementById('custStreet').value = '';
+                document.getElementById('custNumber').value = '';
+                document.getElementById('custNeighborhood').value = '';
+                document.getElementById('custCity').value = '';
+                document.getElementById('custZip').value = '';
+                document.getElementById('custState').value = '';
+                document.getElementById('custComp').value = '';
+            }
+            
+            document.getElementById('modalTitle').innerText = 'Editar Cliente';
+            modal.classList.remove('hidden');
+            setTimeout(() => { content.classList.remove('scale-95', 'opacity-0'); content.classList.add('scale-100', 'opacity-100'); }, 10);
+        }
+
+        function closeModal() {
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+
+        async function submitCustomer(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            try {
+                const res = await fetch('/admin/customers/save', {method:'POST', body:formData});
+                if(res.ok) location.reload();
+                else Swal.fire('Erro', 'Falha ao salvar', 'error');
+            } catch (err) { Swal.fire('Erro', 'Conexão', 'error'); }
+        }
+
+        async function deleteCustomer(id) {
+            if((await Swal.fire({ title: 'Excluir?', icon: 'warning', showCancelButton:true, confirmButtonColor: '#ef4444', background: '#1e293b', color: '#fff' })).isConfirmed) {
+                const res = await fetch(`/admin/customers/${id}`, {method:'DELETE'});
+                if(res.ok) location.reload();
+            }
+        }
+
+        // --- Lógica do Histórico (Mantida) ---
+        async function openHistoryModal(id, name) {
+            const modal = document.getElementById('historyModal');
+            const content = document.getElementById('historyContent');
+            const list = document.getElementById('historyList');
+            document.getElementById('historyClientName').innerText = name;
+            list.innerHTML = '<div class="text-center py-8 text-slate-500"><i class="fas fa-circle-notch fa-spin text-2xl mb-2"></i><br>Buscando histórico...</div>';
+            modal.classList.remove('hidden');
+            setTimeout(() => { content.classList.remove('scale-95', 'opacity-0'); content.classList.add('scale-100', 'opacity-100'); }, 10);
+
+            try {
+                const res = await fetch(`/admin/api/customer/${id}/orders`);
+                const orders = await res.json();
+                list.innerHTML = '';
+                if (orders.length === 0) {
+                    list.innerHTML = '<div class="text-center py-8 text-slate-500 opacity-60"><i class="fas fa-receipt text-4xl mb-2"></i><br>Nenhum pedido encontrado.</div>';
+                    return;
+                }
+                orders.forEach(ord => {
+                    let itemsHtml = '';
+                    ord.items.forEach(i => {
+                        itemsHtml += `<div class="flex justify-between text-xs text-slate-300 py-1 border-b border-slate-700/50 last:border-0"><span>${i.quantity}x ${i.title}</span><span class="font-mono text-slate-400">R$ ${(i.price * i.quantity).toFixed(2)}</span></div>`;
+                    });
+                    const item = document.createElement('div');
+                    item.className = 'bg-slate-900 border border-slate-700 rounded-xl overflow-hidden transition hover:border-slate-500 cursor-pointer';
+                    item.innerHTML = `<div class="p-3 flex justify-between items-center" onclick="this.nextElementSibling.classList.toggle('hidden')"><div><div class="text-xs font-bold text-indigo-300 mb-0.5">Pedido #${ord.id}</div><div class="text-[10px] text-slate-500">${ord.date}</div></div><div class="text-right"><div class="text-sm font-bold text-green-400">R$ ${ord.total.toFixed(2)}</div><div class="text-[10px] text-slate-400 bg-slate-800 px-1.5 rounded inline-block mt-0.5 border border-slate-700">${ord.payment}</div></div></div><div class="bg-black/20 p-3 hidden border-t border-slate-700/50 space-y-1">${itemsHtml}</div>`;
+                    list.appendChild(item);
+                });
+            } catch (e) { list.innerHTML = '<div class="text-center text-red-400 py-4">Erro ao buscar pedidos.</div>'; }
+        }
+        function closeHistoryModal() {
+            const modal = document.getElementById('historyModal');
+            const content = document.getElementById('historyContent');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => { modal.classList.add('hidden'); }, 200);
+        }
+
+        // Variável global para somar seleção
+    
+
+    async function openDebtModal(custId) {
+        const modal = document.getElementById('debtModal');
+        const list = document.getElementById('debtList');
+        
+        // Reseta estado
+        SELECTED_DEBT_IDS = [];
+        updateDebtSelectionUI();
+
+        document.getElementById('debtClientName').innerText = "Buscando dados...";
+        document.getElementById('debtTotalVal').innerText = "---";
+        list.innerHTML = '<div class="text-center py-10 text-slate-500"><i class="fas fa-circle-notch fa-spin text-2xl"></i></div>';
+        
+        modal.classList.remove('hidden');
+
+        try {
+            const res = await fetch(`/admin/api/customer/${custId}/debt`);
+            const data = await res.json();
+
+            document.getElementById('debtClientName').innerText = data.client_name;
+            document.getElementById('debtTotalVal').innerText = `R$ ${data.total_debt.toFixed(2)}`;
+
+            list.innerHTML = '';
+
+            if (data.orders.length === 0) {
+                list.innerHTML = '<div class="text-center py-10 text-slate-500 opacity-60"><p>Nenhum débito pendente.</p></div>';
+                return;
+            }
+
+            data.orders.forEach(order => {
+                const cardId = `debt-order-${order.id}`;
+                
+                // Checkbox HTML
+                const checkHtml = `
+                    <div class="flex items-center justify-center mr-3" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="w-5 h-5 rounded bg-slate-900 border-slate-600 text-green-500 focus:ring-0 cursor-pointer debt-check" 
+                               value="${order.id}" data-val="${order.total}" onchange="toggleDebtCheck(this)">
+                    </div>`;
+
+                // Detalhes dos itens
+                let itemsHtml = order.items.map(i => `<div class="text-xs text-slate-400 flex justify-between"><span>${i.quantity}x ${i.title}</span><span>${(i.price*i.quantity).toFixed(2)}</span></div>`).join('');
+
+                list.innerHTML += `
+                <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden transition hover:border-slate-500 flex flex-col">
+                    <div class="p-3 flex items-center cursor-pointer bg-slate-900/30" 
+                         onclick="document.getElementById('${cardId}').classList.toggle('hidden')">
+                        
+                        ${checkHtml}
+                        
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-bold text-white">${order.date}</span>
+                                <span class="text-red-400 font-bold font-mono">R$ ${order.total.toFixed(2)}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 flex items-center gap-2">
+                                <span class="bg-slate-900 px-1.5 rounded border border-slate-700">#${order.wabiz_id}</span>
+                                <span>Clique para ver detalhes</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="${cardId}" class="hidden bg-black/20 p-3 border-t border-slate-700/50 space-y-1">
+                        ${itemsHtml}
+                    </div>
+                </div>`;
+            });
+
+        } catch (e) { console.error(e); }
+    }
+
+    function toggleDebtCheck(chk) {
+        const val = parseFloat(chk.dataset.val);
+        const id = chk.value;
+        
+        // Recalcula total selecionado
+        let total = 0;
+        const allChecks = document.querySelectorAll('.debt-check:checked');
+        SELECTED_DEBT_IDS = [];
+        
+        allChecks.forEach(c => {
+            total += parseFloat(c.dataset.val);
+            SELECTED_DEBT_IDS.push(c.value);
+        });
+
+        document.getElementById('selectedDebtTotal').innerText = `R$ ${total.toFixed(2)}`;
+        
+        const btn = document.getElementById('btnPayDebt');
+        if (SELECTED_DEBT_IDS.length > 0) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+    }
+    
+    function updateDebtSelectionUI() {
+        document.getElementById('selectedDebtTotal').innerText = `R$ 0.00`;
+        const btn = document.getElementById('btnPayDebt');
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    async function paySelectedDebt() {
+
+        if (SELECTED_DEBT_IDS.length === 0) return;
+
+        const total = SELECTED_DEBT_IDS.reduce((acc, x) => acc + x.val, 0);
+        
+        const { value: method } = await Swal.fire({
+            title: `Receber R$ ${total.toFixed(2)}`,
+            text: "Como o cliente pagou essa dívida?",
+            input: 'select',
+            inputOptions: {
+                'Dinheiro': 'Dinheiro',
+                'Pix': 'Pix',
+                'Cartão Débito': 'Débito',
+                'Cartão Crédito': 'Crédito'
+            },
+            inputPlaceholder: 'Selecione...',
+            background: '#1e293b', 
+            color: '#fff',
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar Pagamento',
+            confirmButtonColor: '#16a34a',
+            customClass: {
+                input: 'bg-slate-800 text-white border border-slate-600 focus:ring-indigo-500 rounded-lg',
+                popup: 'border border-slate-700 shadow-2xl'
+            }
+        });
+
+        if (method) {
+            const ids = SELECTED_DEBT_IDS.map(x => x.id).join(',');
+            const fd = new FormData();
+            fd.append('order_ids', ids);
+            fd.append('payment_method', method);
+
+            try {
+                const res = await fetch('/admin/api/customer/pay-debt', {method: 'POST', body: fd});
+                const data = await res.json();
+                if (res.ok) {
+                    Swal.fire({icon: 'success', title: 'Baixado!', text: 'Valor lançado no caixa de hoje.', timer: 2000, showConfirmButton: false, background:'#1e293b', color:'#fff'});
+                    document.getElementById('debtModal').classList.add('hidden');
+                    location.reload();
+                } else {
+                    Swal.fire('Erro', data.message, 'error');
+                }
+            } catch(e) { Swal.fire('Erro', 'Conexão falhou', 'error'); }
+        }
+    }
+
+    </script>
+{% endblock %}

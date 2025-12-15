@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Garçom ALIV Pro</title>
+    <link href="/static/css/style.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: white;
+            -webkit-tap-highlight-color: transparent;
+            font-family: sans-serif;
+        }
+
+        /* Animações */
+        .slide-in-right {
+            animation: slideInRight 0.3s ease-out forwards;
+        }
+
+        .slide-up {
+            animation: slideUp 0.3s ease-out forwards;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .animate-fade-in-up {
+            animation: fadeInUp 0.3s ease-out forwards;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+            }
+
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .active-cat {
+            background-color: #4f46e5 !important;
+            color: white !important;
+            border-color: #4f46e5 !important;
+        }
+
+        .mesa-card {
+            transition: transform 0.1s;
+        }
+
+        .mesa-card:active {
+            transform: scale(0.96);
+        }
+
+        .safe-pb {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+
+<body class="overflow-hidden h-screen flex flex-col">
+
+    <div class="h-14 bg-slate-900 border-b border-slate-800 flex justify-between items-center px-4 z-50 shadow-md">
+        <button onclick="toggleDrawer()" class="text-slate-300 p-2 -ml-2 active:text-white"><i
+                class="fas fa-bars text-xl"></i></button>
+        <h1 class="font-bold text-lg tracking-tight text-white">ALIV <span class="text-indigo-500">Garçom</span></h1>
+        <div
+            class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold shadow-lg shadow-indigo-500/30">
+            {{ user.full_name[:2].upper() }}
+        </div>
+    </div>
+
+    <div id="drawer-overlay" onclick="toggleDrawer()"
+        class="fixed inset-0 bg-black/80 z-[60] hidden transition-opacity opacity-0"></div>
+    <div id="drawer-menu"
+        class="fixed top-0 left-0 h-full w-3/4 max-w-xs bg-slate-900 z-[70] transform -translate-x-full transition-transform duration-300 shadow-2xl border-r border-slate-800 flex flex-col">
+        <div class="p-6 border-b border-slate-800 bg-slate-950">
+            <h2 class="text-xl font-bold text-white">Menu</h2>
+            <p class="text-xs text-slate-500">Navegação Rápida</p>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-2" id="drawer-list"></div>
+        <div class="p-4 border-t border-slate-800 safe-pb">
+            <button onclick="location.href='/logout?target=waiter'"
+                class="w-full bg-red-900/20 text-red-400 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"><i
+                    class="fas fa-sign-out-alt"></i> Sair</button>
+        </div>
+    </div>
+
+    <div id="view-map" class="flex-1 overflow-y-auto p-4 pb-24 relative fade-in">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Mapa do Salão</h2>
+            <button onclick="fetchTables()"
+                class="text-indigo-400 text-sm flex items-center gap-1 bg-indigo-400/10 px-3 py-1 rounded-full"><i
+                    class="fas fa-sync-alt"></i> Atualizar</button>
+        </div>
+        <div id="grid-mesas" class="grid grid-cols-3 gap-3">
+            <div class="col-span-3 py-20 flex justify-center"><i
+                    class="fas fa-circle-notch fa-spin text-indigo-500 text-3xl"></i></div>
+        </div>
+    </div>
+
+    <div id="view-order" class="fixed inset-0 bg-slate-900 z-50 flex flex-col transform translate-x-full transition-transform duration-300">
+        
+        <div class="h-16 bg-slate-800 border-b border-slate-700 grid grid-cols-3 items-center px-4 shadow-xl shrink-0 relative z-[60]">
+            
+            <div class="flex justify-start">
+                <button onclick="closeTable()" class="flex items-center gap-2 text-slate-400 hover:text-white p-2 -ml-2 transition active:scale-95">
+                    <i class="fas fa-chevron-left text-xl"></i> 
+                    <span class="font-bold text-sm">Voltar</span>
+                </button>
+            </div>
+
+            <div class="flex flex-col items-center justify-center">
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">MESA</span>
+                <span class="text-2xl font-black text-white leading-none" id="lblTableNum">--</span>
+            </div>
+
+            <div class="flex justify-end">
+                <button onclick="requestBill()" class="w-12 h-12 rounded-xl bg-yellow-600/20 text-yellow-500 border border-yellow-600/50 flex items-center justify-center active:bg-yellow-600 active:text-white transition shadow-lg">
+                    <i class="fas fa-file-invoice-dollar text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-3 bg-slate-900 border-b border-slate-800 shrink-0 z-40">
+            <div class="relative">
+                <input type="text" id="prodSearch" onkeyup="filterProducts()" placeholder="Buscar item..."
+                    class="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white text-sm outline-none focus:border-indigo-500 transition shadow-inner">
+                <i class="fas fa-search absolute left-3.5 top-3.5 text-slate-500"></i>
+            </div>
+            <div class="flex gap-2 overflow-x-auto mt-3 pb-1 no-scrollbar" id="catFilters"></div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 space-y-2 pb-32" id="prodList"></div>
+
+        <div id="bottomBar"
+            class="fixed bottom-0 w-full bg-slate-800 border-t border-slate-700 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] z-50 safe-pb hidden slide-up">
+            <div class="flex justify-between items-center gap-4">
+                <div class="flex flex-col">
+                    <span class="text-xs text-slate-400 font-bold uppercase">Parcial</span>
+                    <span class="text-xl font-bold text-white" id="lblTotalBar">R$ 0,00</span>
+                </div>
+                <button onclick="openPreview()"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 active:scale-95 transition-transform">
+                    <span>AVANÇAR</span>
+                    <span id="badgeCount"
+                        class="bg-white text-indigo-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">0</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pizzaBuilder"
+        class="fixed inset-0 bg-slate-900 z-[60] flex flex-col transform translate-y-full transition-transform duration-300">
+        <div class="bg-indigo-900 p-4 shadow-lg flex justify-between items-center shrink-0">
+            <h3 class="font-bold text-white flex items-center gap-2"><i class="fas fa-pizza-slice"></i> Montar Pizza
+            </h3>
+            <button onclick="closePizzaBuilder()" class="text-indigo-200 p-2"><i
+                    class="fas fa-times text-xl"></i></button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-6">
+            <div class="step-group">
+                <h4 class="text-xs font-bold text-indigo-400 uppercase mb-3 flex items-center gap-2"><span
+                        class="bg-indigo-500/20 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">1</span>
+                    Escolha o Tamanho</h4>
+                <div class="grid grid-cols-2 gap-3" id="pb-sizes"></div>
+            </div>
+            <div class="step-group hidden" id="step-flavors">
+                <div class="flex justify-between items-end mb-3">
+                    <h4 class="text-xs font-bold text-indigo-400 uppercase flex items-center gap-2"><span
+                            class="bg-indigo-500/20 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">2</span>
+                        Sabores (<span id="pb-flavor-count">0</span>/2)</h4>
+                    <span class="text-[10px] text-slate-400">Até 2 sabores</span>
+                </div>
+                <input type="text" id="pb-search-flavor" placeholder="Filtrar sabor..."
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm mb-3 text-white outline-none focus:border-indigo-500"
+                    onkeyup="filterBuilderFlavors()">
+                <div class="space-y-2 max-h-60 overflow-y-auto" id="pb-flavors-list"></div>
+            </div>
+            <div class="step-group hidden" id="step-edges">
+                <h4 class="text-xs font-bold text-indigo-400 uppercase mb-3 mt-4 flex items-center gap-2"><span
+                        class="bg-indigo-500/20 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">3</span>
+                    Borda Recheada</h4>
+                <div class="space-y-2" id="pb-edges-list"></div>
+            </div>
+        </div>
+        <div class="p-4 bg-slate-800 border-t border-slate-700 safe-pb shrink-0">
+            <div class="mb-3">
+                <label class="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Observação</label>
+                <input type="text" id="pb-obs"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-sm outline-none focus:border-indigo-500"
+                    placeholder="Ex: Sem cebola, bem passada...">
+            </div>
+
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-slate-400 text-sm">Valor Final</span>
+                <span class="text-2xl font-bold text-green-400" id="pb-total">R$ 0,00</span>
+            </div>
+            <button onclick="addPizzaToCart()" id="pb-btn-add" disabled
+                class="w-full bg-slate-700 text-slate-400 py-3.5 rounded-xl font-bold text-lg transition-all active:scale-95">Selecione
+                o Tamanho</button>
+        </div>
+    </div>
+
+    <div id="previewModal" class="fixed inset-0 bg-black/90 z-[70] flex flex-col justify-end hidden">
+        <div class="flex-1" onclick="closePreview()"></div>
+        <div class="bg-slate-800 rounded-t-3xl max-h-[90vh] flex flex-col slide-up relative shadow-2xl">
+            <div class="w-12 h-1.5 bg-slate-600 rounded-full mx-auto mt-3 mb-2 opacity-50"></div>
+            <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center shrink-0">
+                <div>
+                    <h3 class="text-xl font-bold text-white">Conferência</h3>
+                    <p class="text-xs text-slate-400">Mesa <span id="reviewTableNum"
+                            class="text-yellow-400 font-bold">--</span></p>
+                </div>
+                <button onclick="closePreview()"
+                    class="w-8 h-8 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-3" id="previewList"></div>
+            <div class="p-5 bg-slate-900 border-t border-slate-700 safe-pb shrink-0">
+                <div class="flex justify-between items-center mb-4"><span
+                        class="text-slate-400 font-bold uppercase text-xs">Total do Pedido</span><span
+                        class="text-3xl font-bold text-green-400" id="previewTotal">R$ 0,00</span></div>
+                <button onclick="sendOrderToKitchen()" id="btnSend"
+                    class="w-full bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-3 active:scale-95 transition-transform"><i
+                        class="fas fa-paper-plane"></i> ENVIAR P/ COZINHA</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let DATA = { products: [], sizes: [], addons: [], fees: {} };
+        let CART = [];
+        let CURRENT_TABLE = null;
+        let EXISTING_ORDER_ID = null;
+        let CURRENT_CATEGORY = 'all';
+        let CURRENT_PIZZA_BUILD = { size: null, flavors: [], edge: null, price: 0 };
+        // Variável global para controlar o tempo
+        let SEARCH_TIMEOUT = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+
+            // --- LÓGICA DO BOTÃO VOLTAR (NOVO) ---
+            // Cria um estado "falso" no histórico para interceptar o voltar
+            history.pushState(null, null, location.href);
+
+            window.onpopstate = function () {
+                // Empurra de novo para o usuário não sair se cancelar
+                history.pushState(null, null, location.href);
+
+                Swal.fire({
+                    title: 'Sair do App?',
+                    text: "Você deseja desconectar e sair?",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444', // Vermelho
+                    cancelButtonColor: '#334155',  // Slate
+                    confirmButtonText: 'Sim, Sair',
+                    cancelButtonText: 'Não, Ficar',
+                    background: '#1e293b',
+                    color: '#fff',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Se confirmar, redireciona para logout (sair efetivamente)
+                        window.location.href = '/logout?target=waiter';
+                    }
+                });
+            };
+            // -------------------------------------
+
+            await loadSystemData();
+            await fetchTables();
+            setInterval(fetchTables, 10000);
+        });
+
+        async function loadSystemData() {
+            try {
+                const res = await fetch('/admin/api/pdv/data');
+                DATA = await res.json();
+                renderDrawerCategories();
+                renderCategoryFilters();
+            } catch (e) { console.error("Erro dados:", e); }
+        }
+
+        async function fetchTables() {
+            try {
+                const res = await fetch('/admin/api/orders/list?tab=mesas');
+                const data = await res.json();
+                const orders = data.orders || [];
+                renderGrid(orders);
+            } catch (e) { }
+        }
+
+        function renderGrid(orders) {
+            const grid = document.getElementById('grid-mesas');
+            if (!grid) return;
+            grid.innerHTML = '';
+            for (let i = 1; i <= 20; i++) {
+                const order = orders.find(o => o.table == i && o.status !== 'ENTREGUE' && !o.status.includes('CANCELADO'));
+                const isBusy = !!order;
+                const statusColor = isBusy ? 'border-red-500/50 bg-red-900/20' : 'border-slate-700 bg-slate-800';
+                const statusText = isBusy ? `R$ ${order.total.toFixed(2)}` : 'Livre';
+                const icon = isBusy ? 'text-red-400 fa-user-friends' : 'text-slate-600 fa-check';
+                const safeName = order ? order.name.replace(/'/g, "\\'") : '';
+
+                grid.innerHTML += `
+                <div onclick="openTable(${i}, ${order ? order.id : 'null'}, '${safeName}')" 
+                     class="mesa-card ${statusColor} border rounded-2xl p-3 flex flex-col items-center justify-center h-28 relative cursor-pointer active:bg-slate-700 shadow-sm">
+                    <span class="absolute top-2 left-3 text-[10px] font-bold text-slate-400 uppercase">Mesa</span>
+                    <span class="absolute top-1 left-12 text-lg font-bold text-white">${i}</span>
+                    <i class="fas ${icon} text-2xl mb-1 mt-2"></i>
+                    <span class="text-xs font-bold text-slate-200">${statusText}</span>
+                </div>`;
+            }
+        }
+
+        function renderDrawerCategories() {
+            const menu = document.getElementById('drawer-list');
+            if (!menu) return;
+            let html = `<div class="mb-6 space-y-2 pb-4 border-b border-slate-800">`;
+            html += `
+                <button onclick="goToTables()" class="w-full text-left p-3 rounded-xl bg-slate-800 text-white font-bold flex items-center gap-3 active:scale-95 transition">
+                    <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center"><i class="fas fa-th text-indigo-400"></i></div>
+                    Todas as Mesas
+                </button>`;
+
+            if (CURRENT_TABLE) {
+                html += `
+                <button onclick="showTableSummary()" class="w-full text-left p-3 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-3 active:scale-95 transition shadow-lg shadow-indigo-500/20">
+                    <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center"><i class="fas fa-receipt text-white"></i></div>
+                    <div>
+                        <div class="leading-none">Resumo Mesa ${CURRENT_TABLE}</div>
+                        <div class="text-[10px] opacity-70 font-normal mt-0.5">Ver consumo total</div>
+                    </div>
+                </button>`;
+            }
+
+            html += `</div><div class="text-xs font-bold text-slate-500 uppercase mb-2 px-1">Cardápio</div>`;
+            html += `<button onclick="filterCat('all'); toggleDrawer()" class="w-full text-left p-3 rounded-lg bg-slate-800 text-white font-bold mb-1 border border-slate-700">Todos os Itens</button>`;
+            if (DATA.categories) {
+                DATA.categories.forEach(c => {
+                    html += `<button onclick="filterCat(${c.id}); toggleDrawer()" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 text-slate-300 transition">${c.name}</button>`;
+                });
+            } else {
+                html += `<button onclick="filterCat('pizza'); toggleDrawer()" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 text-slate-300 transition">🍕 Pizzas</button>`;
+                html += `<button onclick="filterCat('bebida'); toggleDrawer()" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 text-slate-300 transition">🥤 Bebidas</button>`;
+                html += `<button onclick="filterCat('outros'); toggleDrawer()" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 text-slate-300 transition">🍔 Lanches/Porções</button>`;
+            }
+            menu.innerHTML = html;
+        }
+
+        function renderCategoryFilters() {
+            const container = document.getElementById('catFilters');
+            if (!container) return;
+            let html = `<button onclick="filterCat('all')" id="cat-btn-all" class="cat-btn active-cat bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border border-slate-700 transition shadow-sm">Tudo</button>`;
+            if (DATA.categories) {
+                DATA.categories.forEach(c => {
+                    html += `<button onclick="filterCat(${c.id})" id="cat-btn-${c.id}" class="cat-btn bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border border-slate-700 transition shadow-sm">${c.name}</button>`;
+                });
+            } else {
+                html += `<button onclick="filterCat('pizza')" id="cat-btn-pizza" class="cat-btn bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border border-slate-700 transition shadow-sm">Pizzas</button><button onclick="filterCat('bebida')" id="cat-btn-bebida" class="cat-btn bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border border-slate-700 transition shadow-sm">Bebidas</button><button onclick="filterCat('outros')" id="cat-btn-outros" class="cat-btn bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border border-slate-700 transition shadow-sm">Outros</button>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function renderProductsList() {
+            const list = document.getElementById('prodList');
+            if (!list) return;
+            
+            // 1. Otimização: Monta o HTML em uma variável gigante na memória
+            let htmlBuffer = ''; 
+            
+            const term = document.getElementById('prodSearch').value.toLowerCase();
+            const filter = CURRENT_CATEGORY;
+
+            const filtered = DATA.products.filter(p => {
+                const matchesTerm = p.name.toLowerCase().includes(term);
+                let matchesCat = true;
+                if (filter !== 'all') {
+                    if (typeof filter === 'number') matchesCat = p.category_id === filter;
+                    else if (filter === 'pizza') matchesCat = p.is_pizza;
+                    else if (filter === 'bebida') matchesCat = !p.is_pizza && (p.name.toLowerCase().includes('coca') || p.name.toLowerCase().includes('suco'));
+                    else if (filter === 'outros') matchesCat = !p.is_pizza && !(p.name.toLowerCase().includes('coca'));
+                }
+                return matchesTerm && matchesCat;
+            });
+            
+            // Limite de segurança: Renderiza no máximo 100 itens para não travar scroll se a busca for vazia
+            const safeList = filtered.slice(0, 100);
+
+            if (safeList.length === 0) { 
+                list.innerHTML = `<div class="text-center py-10 text-slate-500 text-sm">Nenhum item encontrado.</div>`; 
+                return; 
+            }
+
+            safeList.forEach(p => {
+                const action = p.is_pizza ? `openPizzaBuilder(${p.id})` : `addItemToCart(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})`;
+                const icon = p.is_pizza ? '<i class="fas fa-chevron-right text-slate-500"></i>' : '<i class="fas fa-plus text-indigo-400"></i>';
+                const inCart = CART.find(i => i.id === p.id && i.type === 'simple');
+                const qtyBadge = inCart ? `<span class="bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded ml-2">${inCart.quantity}</span>` : '';
+
+                let priceHtml = '';
+
+                if (p.is_pizza && p.size_prices) {
+                    const sizes = Object.entries(p.size_prices)
+                        .map(([sid, val]) => {
+                            const sObj = DATA.sizes.find(s => s.id == sid);
+                            return { name: sObj ? sObj.name : 'Tam', price: val };
+                        })
+                        .sort((a, b) => a.price - b.price);
+
+                    const validSizes = sizes.filter(s => s.price > 0);
+
+                    if (validSizes.length > 0) {
+                        const pricesText = validSizes.map(s => `<span class="whitespace-nowrap"><span class="text-slate-500">${s.name}:</span> <span class="text-green-400 font-bold">R$${s.price.toFixed(0)}</span></span>`).join(' <span class="text-slate-600 mx-1">|</span> ');
+                        priceHtml = `<div class="text-[10px] mt-1 overflow-x-auto flex flex-wrap gap-y-1">${pricesText}</div>`;
+                    } else {
+                        priceHtml = `<div class="text-xs text-green-400 font-mono mt-1 font-bold">A partir de R$ 0,00</div>`;
+                    }
+                } else {
+                    priceHtml = `<div class="text-xs text-green-400 font-mono mt-1 font-bold">R$ ${p.price.toFixed(2)}</div>`;
+                }
+
+                // 2. Otimização: Concatena na String (MUITO mais rápido que mexer no DOM)
+                htmlBuffer += `
+                <div onclick="${action}" class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center active:bg-slate-750 transition cursor-pointer mb-2 shadow-sm">
+                    <div class="flex-1 min-w-0 pr-2">
+                        <div class="font-bold text-white text-sm leading-tight flex items-center truncate">
+                            ${p.name} ${qtyBadge}
+                        </div>
+                        ${priceHtml}
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center shadow-inner border border-slate-700/50 shrink-0">
+                        ${icon}
+                    </div>
+                </div>`;
+            });
+
+            // 3. Otimização: Injeta o HTML de uma vez só
+            list.innerHTML = htmlBuffer;
+        }
+
+        function filterCat(cat) {
+            CURRENT_CATEGORY = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active-cat'));
+            const activeBtn = document.getElementById(`cat-btn-${cat}`);
+            if (activeBtn) activeBtn.classList.add('active-cat');
+            renderProductsList();
+        }
+
+        function filterProducts() {
+            // Cancela a busca anterior se você ainda estiver digitando/apagando
+            clearTimeout(SEARCH_TIMEOUT);
+            
+            // Só executa daqui a 300ms se você parar de mexer
+            SEARCH_TIMEOUT = setTimeout(() => {
+                renderProductsList();
+            }, 300);
+        }
+
+
+        function toggleDrawer() {
+            const drawer = document.getElementById('drawer-menu');
+            const overlay = document.getElementById('drawer-overlay');
+            if (drawer.classList.contains('-translate-x-full')) {
+                drawer.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('opacity-100'), 10);
+            } else {
+                drawer.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+                overlay.classList.remove('opacity-100');
+            }
+        }
+        function openTable(num, orderId, name) {
+            CURRENT_TABLE = num;
+            EXISTING_ORDER_ID = orderId;
+            CART = [];
+            updateCartBadge();
+            const lbl = document.getElementById('lblTableNum');
+            if (lbl) lbl.innerText = num;
+            document.getElementById('view-order').classList.remove('translate-x-full');
+            document.getElementById('prodSearch').value = '';
+            filterCat('all');
+            renderDrawerCategories();
+        }
+        function closeTable() {
+            document.getElementById('view-order').classList.add('translate-x-full');
+            fetchTables();
+            CURRENT_TABLE = null;
+            renderDrawerCategories();
+        }
+
+        async function addItemToCart(id, name, price) {
+            const product = DATA.products.find(p => p.id === id);
+            let ingredientsHtml = '';
+
+            if (product && product.ingredients && product.ingredients.length > 0) {
+                ingredientsHtml = `
+    <div class="mt-4 bg-slate-800 p-3 rounded-lg border border-slate-700 text-left">
+        <label class="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Ingredientes (Desmarque para retirar)</label>
+        <div class="grid grid-cols-2 gap-2">`;
+                product.ingredients.forEach(ing => {
+                    ingredientsHtml += `
+        <label class="flex items-center gap-2 cursor-pointer p-1 active:bg-slate-700 rounded">
+            <input type="checkbox" class="waiter-ing-check w-5 h-5 rounded bg-slate-900 border-slate-600 text-red-500 focus:ring-0" 
+                   value="${ing.id}" checked>
+            <span class="text-xs text-slate-300">${ing.name}</span>
+        </label>`;
+                });
+                ingredientsHtml += `</div></div>`;
+            }
+
+            const { value: formValues } = await Swal.fire({
+                title: name,
+                html: `
+        <div class="text-left">
+            <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Quantidade</label>
+            
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <button type="button" onclick="document.getElementById('m-qty').stepDown()" 
+                    class="bg-slate-700 hover:bg-slate-600 w-12 h-12 rounded-xl text-xl font-bold text-white shadow-lg active:scale-95 transition flex-shrink-0 flex items-center justify-center">
+                    <i class="fas fa-minus"></i>
+                </button>
+                
+                <input type="number" id="m-qty" 
+                    class="flex-1 bg-slate-900 border border-slate-700 rounded-xl h-12 text-center text-white font-bold text-xl outline-none min-w-[60px]" 
+                    value="1">
+                
+                <button type="button" onclick="document.getElementById('m-qty').stepUp()" 
+                    class="bg-indigo-600 hover:bg-indigo-500 w-12 h-12 rounded-xl text-xl font-bold text-white shadow-lg active:scale-95 transition flex-shrink-0 flex items-center justify-center">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+
+            <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Observação</label>
+            <input type="text" id="m-obs" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm" placeholder="Ex: Bem passado...">
+            ${ingredientsHtml}
+        </div>
+    `,
+                background: '#1e293b', color: '#fff',
+                showCancelButton: true, confirmButtonText: 'ADICIONAR', confirmButtonColor: '#16a34a', cancelButtonText: 'Cancelar', focusConfirm: false,
+                preConfirm: () => {
+                    const removedIds = [];
+                    document.querySelectorAll('.waiter-ing-check').forEach(cb => { if (!cb.checked) removedIds.push(parseInt(cb.value)); });
+                    return { qty: document.getElementById('m-qty').value, obs: document.getElementById('m-obs').value, removed: removedIds }
+                }
+            });
+
+            if (formValues) {
+                CART.push({
+                    type: 'simple',
+                    id, title: name, price,
+                    quantity: parseFloat(formValues.qty),
+                    observation: formValues.obs,
+                    removed_ingredients: formValues.removed
+                });
+                updateCartBadge();
+                if (navigator.vibrate) navigator.vibrate(50);
+                const Toast = Swal.mixin({ toast: true, position: 'bottom', showConfirmButton: false, timer: 700, background: '#10b981', color: '#fff' });
+                Toast.fire({ icon: 'success', title: 'Adicionado!' });
+            }
+        }
+
+        function openPizzaBuilder(prodId) {
+            // Reseta o objeto de construção
+            CURRENT_PIZZA_BUILD = { size: null, flavors: [], edge: null, price: 0 };
+            
+            // Reseta a interface
+            document.getElementById('pizzaBuilder').classList.remove('translate-y-full');
+            document.getElementById('step-flavors').classList.add('hidden');
+            document.getElementById('step-edges').classList.add('hidden');
+            document.getElementById('pb-btn-add').disabled = true;
+            document.getElementById('pb-btn-add').innerText = 'Selecione Tamanho';
+            
+            // Limpa campo de busca se existir
+            const searchInput = document.getElementById('pb-search-flavor');
+            if(searchInput) searchInput.value = '';
+
+            // Renderiza os Tamanhos
+            const product = DATA.products.find(p => p.id === prodId);
+            const box = document.getElementById('pb-sizes'); 
+            box.innerHTML = '';
+            
+            DATA.sizes.forEach(s => {
+                // VERIFICAÇÃO CORRIGIDA: Usa s.id (variável do loop) e não sizeId
+                if(product.size_prices && product.size_prices[s.id]) {
+                    const price = product.size_prices[s.id];
+                    
+                    box.innerHTML += `
+                    <div onclick="selectPizzaSize(${s.id}, '${s.name}', ${price}, ${product.id})" 
+                        class="pb-size-card bg-slate-800 border border-slate-600 p-4 rounded-xl text-center active:bg-indigo-900 active:border-indigo-500 transition shadow-sm">
+                        <div class="font-bold text-white">${s.name}</div>
+                        <div class="text-green-400 text-sm font-mono mt-1">R$ ${price.toFixed(2)}</div>
+                    </div>`;
+                }
+            });
+        }
+
+        function closePizzaBuilder() { document.getElementById('pizzaBuilder').classList.add('translate-y-full'); }
+
+        function selectPizzaSize(sizeId, sizeName, basePrice, mainProdId) {
+            const sizeObj = DATA.sizes.find(s => s.id === sizeId);
+            const maxF = sizeObj ? (sizeObj.max_flavors || 2) : 2;
+            CURRENT_PIZZA_BUILD.size = { id: sizeId, name: sizeName, max_flavors: maxF };
+            CURRENT_PIZZA_BUILD.price = basePrice;
+            
+            // Visual do card de tamanho
+            document.querySelectorAll('.pb-size-card').forEach(el => el.classList.remove('bg-indigo-900', 'border-indigo-500', 'ring-2', 'ring-indigo-500'));
+            event.currentTarget.classList.add('bg-indigo-900', 'border-indigo-500', 'ring-2', 'ring-indigo-500');
+            
+            const stepFlavors = document.getElementById('step-flavors');
+            const header = stepFlavors.querySelector('h4');
+            if (header) header.innerHTML = `<span class="bg-indigo-500/20 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">2</span> Sabores (<span id="pb-flavor-count">1</span>/${maxF})`;
+            
+            const flavorList = document.getElementById('pb-flavors-list');
+            flavorList.innerHTML = '';
+            
+            const allPizzas = DATA.products.filter(p => p.is_pizza);
+            
+            // Renderiza lista de sabores
+            allPizzas.forEach(p => {
+                let pPrice = p.size_prices && p.size_prices[sizeId] ? p.size_prices[sizeId] : p.price;
+                const isSelected = p.id === mainProdId;
+                
+                flavorList.innerHTML += `
+            <div class="flavor-item-wrapper border-b border-slate-700/50 last:border-0 rounded-lg overflow-hidden mb-1" id="flavor-wrap-${p.id}">
+                <label class="flex items-center justify-between p-3 bg-slate-800 hover:bg-slate-700 transition cursor-pointer active:bg-slate-900">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" value="${p.id}" data-name="${p.name}" data-price="${pPrice}" 
+                               onchange="toggleFlavor(this)" class="w-6 h-6 rounded bg-slate-700 border-slate-500 text-indigo-500 focus:ring-0" 
+                               ${isSelected ? 'checked' : ''} onclick="${isSelected ? 'return false;' : ''}">
+                        <span class="text-sm text-white flavor-name">${p.name}</span>
+                    </div>
+                    <span class="text-xs text-slate-400">R$ ${pPrice.toFixed(2)}</span>
+                </label>
+            </div>`;
+            });
+            
+            CURRENT_PIZZA_BUILD.flavors = [];
+            
+            // Seleciona e processa o sabor inicial
+            const mainChk = flavorList.querySelector(`input[value="${mainProdId}"]`);
+            if (mainChk) {
+                mainChk.checked = true;
+                toggleFlavor(mainChk);
+            }
+            
+            // Renderiza Bordas
+            const edgeList = document.getElementById('pb-edges-list');
+            edgeList.innerHTML = `<label class="flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-700 mb-2 active:bg-slate-700"><input type="radio" name="edge" value="0" data-price="0" data-name="Sem Borda" checked onchange="selectEdge(this)" class="w-6 h-6 text-indigo-500 bg-slate-700 border-slate-500 focus:ring-0"><span class="text-sm text-white font-bold">Sem Borda</span></label>`;
+            
+            DATA.addons.filter(a => a.type === 'edge').forEach(e => {
+                const ePrice = e.prices && e.prices[sizeId] ? e.prices[sizeId] : 0;
+                edgeList.innerHTML += `
+            <label class="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700 mb-2 active:bg-slate-700">
+                <div class="flex items-center gap-3">
+                    <input type="radio" name="edge" value="${e.id}" data-name="${e.name}" data-price="${ePrice}" onchange="selectEdge(this)" class="w-6 h-6 text-indigo-500 bg-slate-700 border-slate-500 focus:ring-0">
+                    <span class="text-sm text-white">${e.name}</span>
+                </div>
+                <span class="text-xs text-green-400 font-bold">+R$ ${ePrice.toFixed(2)}</span>
+            </label>`;
+            });
+            
+            // Mostra os passos seguintes
+            document.getElementById('step-flavors').classList.remove('hidden');
+            document.getElementById('step-edges').classList.remove('hidden');
+            
+            updatePizzaTotal();
+
+            // --- CORREÇÃO: SCROLL AUTOMÁTICO PARA O SABOR SELECIONADO ---
+            setTimeout(() => {
+                // 1. Rola a página até a seção de sabores para garantir que ela esteja visível
+                document.getElementById('step-flavors').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // 2. Se tivermos o checkbox principal (sabor inicial), foca nele
+                if (mainChk) {
+                    const wrapper = document.getElementById(`flavor-wrap-${mainProdId}`);
+                    if (wrapper) {
+                        // Rola a lista interna para centralizar o item
+                        wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Opcional: Adiciona um destaque visual temporário (flash)
+                        wrapper.classList.add('bg-indigo-900/30');
+                        setTimeout(() => wrapper.classList.remove('bg-indigo-900/30'), 1000);
+                    }
+                }
+            }, 300); // Delay pequeno para garantir que o DOM renderizou e o "hidden" saiu
+        }
+
+        // --- FUNÇÕES ATUALIZADAS (COM ADICIONAIS RECOLHÍVEIS) ---
+
+        function toggleFlavor(chk) {
+            const id = parseInt(chk.value);
+            const name = chk.dataset.name;
+            const price = parseFloat(chk.dataset.price);
+            const limit = CURRENT_PIZZA_BUILD.size.max_flavors || 1;
+            const wrapper = chk.closest('div.flavor-item-wrapper');
+
+            if (chk.checked) {
+                // Validação de Limite
+                if (CURRENT_PIZZA_BUILD.flavors.length >= limit) {
+                    chk.checked = false;
+                    return Swal.fire({ toast: true, text: `Máximo de ${limit} sabores!`, position: 'top', icon: 'warning', background: '#1e293b', color: '#fff' });
+                }
+
+                // Adiciona ao array
+                CURRENT_PIZZA_BUILD.flavors.push({ id, name, price });
+
+                // 1. RENDERIZA INGREDIENTES (Para Remover) - Mantém visível pois é importante
+                const prodData = DATA.products.find(p => p.id === id);
+                if (prodData && prodData.ingredients && prodData.ingredients.length > 0) {
+                    const ingBox = document.createElement('div');
+                    ingBox.id = `ing-box-${id}`;
+                    ingBox.className = "pl-2 pr-2 mt-1 mb-2 animate-fade-in-up";
+                    
+                    let html = `
+                    <div class="bg-red-900/20 p-2 rounded-lg border border-red-500/30">
+                        <p class="text-[9px] text-red-400 font-bold uppercase mb-2 flex items-center gap-1"><i class="fas fa-minus-circle"></i> Retirar:</p>
+                        <div class="grid grid-cols-2 gap-2">`;
+                    
+                    prodData.ingredients.forEach(ing => {
+                        html += `
+                        <label class="flex items-center gap-2 cursor-pointer p-1 bg-slate-800 rounded border border-slate-700 active:border-red-500 transition">
+                            <input type="checkbox" class="waiter-pizza-ing-check w-4 h-4 rounded bg-slate-900 border-slate-600 text-red-500 focus:ring-0" 
+                                value="${ing.id}" checked>
+                            <span class="text-[10px] text-slate-300 leading-tight">${ing.name}</span>
+                        </label>`;
+                    });
+                    html += `</div></div>`;
+                    ingBox.innerHTML = html;
+                    wrapper.appendChild(ingBox);
+                }
+
+                // 2. RENDERIZA ADICIONAIS / EXTRAS (Recolhido com Seta)
+                const sizeId = CURRENT_PIZZA_BUILD.size.id;
+                const extras = DATA.addons.filter(a => a.type === 'extra' && a.prices && a.prices[sizeId]);
+
+                if (extras.length > 0) {
+                    const extBox = document.createElement('div');
+                    extBox.id = `ext-box-${id}`;
+                    extBox.className = "pl-2 pr-2 mt-1 mb-2 animate-fade-in-up";
+                    
+                    // Cabeçalho Clicável + Lista Oculta (hidden)
+                    let html = `
+                    <div onclick="toggleWaiterExtras(${id})" class="flex justify-between items-center bg-emerald-900/20 p-3 rounded-lg border border-emerald-500/30 cursor-pointer active:bg-emerald-900/40 transition">
+                        <span class="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-2">
+                            <i class="fas fa-plus-circle"></i> Adicionais
+                        </span>
+                        <i id="arrow-ext-${id}" class="fas fa-chevron-down text-emerald-400 text-xs transition-transform duration-200"></i>
+                    </div>
+
+                    <div id="list-ext-${id}" class="grid grid-cols-1 gap-2 mt-2 hidden bg-slate-900/30 p-2 rounded-lg border border-slate-700/50">`;
+                    
+                    extras.forEach(ext => {
+                        const extPrice = ext.prices[sizeId];
+                        html += `
+                        <label class="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700 active:border-emerald-500 transition cursor-pointer">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" class="waiter-extra-check w-5 h-5 rounded bg-slate-900 border-slate-600 text-emerald-500 focus:ring-0" 
+                                    value="${ext.id}" data-name="${ext.name}" data-price="${extPrice}" data-parent-flavor="${id}"
+                                    onchange="updatePizzaTotal()">
+                                <span class="text-sm text-white font-bold">${ext.name}</span>
+                            </div>
+                            <span class="text-xs text-emerald-400 font-mono font-bold bg-slate-900 px-2 py-1 rounded border border-slate-700">+R$ ${extPrice.toFixed(2)}</span>
+                        </label>`;
+                    });
+                    
+                    html += `</div>`;
+                    extBox.innerHTML = html;
+                    wrapper.appendChild(extBox);
+                }
+
+            } else {
+                // Remove do array
+                CURRENT_PIZZA_BUILD.flavors = CURRENT_PIZZA_BUILD.flavors.filter(f => f.id !== id);
+                
+                // Remove visualmente as caixas
+                const ingBox = document.getElementById(`ing-box-${id}`);
+                if (ingBox) ingBox.remove();
+                
+                const extBox = document.getElementById(`ext-box-${id}`);
+                if (extBox) extBox.remove();
+            }
+            
+            updateFlavorCount();
+            updatePizzaTotal();
+        }
+
+        // --- NOVA FUNÇÃO: ABRE/FECHA A LISTA DE EXTRAS ---
+        function toggleWaiterExtras(id) {
+            const list = document.getElementById(`list-ext-${id}`);
+            const arrow = document.getElementById(`arrow-ext-${id}`);
+            
+            if (list.classList.contains('hidden')) {
+                list.classList.remove('hidden');
+                arrow.classList.add('-rotate-180'); // Gira a seta pra cima
+            } else {
+                list.classList.add('hidden');
+                arrow.classList.remove('-rotate-180'); // Gira a seta pra baixo
+            }
+        }
+
+        function updatePizzaTotal() {
+            let maxFlavorPrice = 0;
+            if (CURRENT_PIZZA_BUILD.flavors.length > 0) {
+                maxFlavorPrice = Math.max(...CURRENT_PIZZA_BUILD.flavors.map(f => f.price));
+            }
+            
+            let total = maxFlavorPrice;
+
+            if (CURRENT_PIZZA_BUILD.edge) total += CURRENT_PIZZA_BUILD.edge.price;
+
+            const checkedExtras = document.querySelectorAll('.waiter-extra-check:checked');
+            checkedExtras.forEach(chk => {
+                total += parseFloat(chk.dataset.price || 0);
+            });
+
+            CURRENT_PIZZA_BUILD.finalPrice = total;
+            document.getElementById('pb-total').innerText = `R$ ${total.toFixed(2)}`;
+
+            const btn = document.getElementById('pb-btn-add');
+            if (CURRENT_PIZZA_BUILD.size && CURRENT_PIZZA_BUILD.flavors.length > 0) {
+                btn.disabled = false;
+                btn.classList.remove('bg-slate-700', 'text-slate-400');
+                btn.classList.add('bg-green-600', 'text-white', 'shadow-lg');
+                btn.innerText = 'Confirmar Pizza';
+            } else {
+                btn.disabled = true;
+                btn.classList.add('bg-slate-700', 'text-slate-400');
+                btn.classList.remove('bg-green-600', 'text-white', 'shadow-lg');
+                btn.innerText = 'Selecione Tamanho e Sabor';
+            }
+        }
+
+        function addPizzaToCart() {
+            // 1. Identifica Ingredientes Removidos
+            const removedIds = [];
+            const removedNames = [];
+            document.querySelectorAll('.waiter-pizza-ing-check').forEach(cb => {
+                if (!cb.checked) {
+                    removedIds.push(parseInt(cb.value));
+                    // Tenta pegar o nome do ingrediente (se estiver disponível no atributo ou texto)
+                    const label = cb.closest('label').querySelector('span');
+                    if (label) removedNames.push(label.innerText);
+                }
+            });
+
+            // 2. Prepara Estruturas de Dados (Iguais ao PDV)
+            const flavorCount = CURRENT_PIZZA_BUILD.flavors.length;
+            const fraction = flavorCount > 1 ? `1/${flavorCount} ` : '';
+            
+            let generatedDetails = [];
+            let partsRich = [];
+            let cleanPartsNames = [];
+
+            // 3. Processa Sabores e Extras
+            const flavorNamesTitle = CURRENT_PIZZA_BUILD.flavors.map(f => {
+                // A) Processa Adicionais deste sabor
+                const extras = [];
+                document.querySelectorAll(`.waiter-extra-check:checked[data-parent-flavor="${f.id}"]`).forEach(chk => {
+                    extras.push(chk.dataset.name);
+                    
+                    // Adiciona ao detalhe estruturado (Verde no KDS)
+                    generatedDetails.push({
+                        type: 'addon',
+                        text: `  + ${chk.dataset.name}`,
+                        code: chk.value
+                    });
+                });
+
+                // B) Adiciona o Sabor ao detalhe estruturado (Branco no KDS)
+                // Inserimos ANTES dos adicionais (unshift não funciona bem aqui pois processamos linearmente)
+                // A solução é inserir na ordem: Sabor -> Adicionais.
+                // Como já inserimos os adicionais no loop acima (erro de lógica comum), vamos corrigir a ordem:
+                
+                // --- CORREÇÃO DE ORDEM DE INSERÇÃO ---
+                // Removemos os adicionais que acabamos de colocar no generatedDetails temporariamente
+                const theseAddons = generatedDetails.splice(generatedDetails.length - extras.length, extras.length);
+                
+                // 1. Coloca o Sabor
+                generatedDetails.push({
+                    type: 'flavor',
+                    text: `• ${fraction}${f.name}`,
+                    code: f.id
+                });
+                
+                // 2. Devolve os Adicionais logo abaixo dele
+                generatedDetails = generatedDetails.concat(theseAddons);
+                
+                // C) Prepara dados para o Título e Banco
+                let nameForTitle = f.name;
+                
+                // Salva parts_rich
+                partsRich.push({ id: f.id, name: f.name, price: f.price });
+                cleanPartsNames.push(f.name);
+
+                return nameForTitle; // Retorna nome limpo para o título (sem adicionais, para ficar curto)
+            });
+
+            // 4. Processa Borda
+            if (CURRENT_PIZZA_BUILD.edge) {
+                generatedDetails.push({
+                    type: 'edge',
+                    text: `🧀 Borda: ${CURRENT_PIZZA_BUILD.edge.name}`,
+                    code: CURRENT_PIZZA_BUILD.edge.id
+                });
+            }
+
+            // 5. Processa Remoções (Visual)
+            removedNames.forEach(name => {
+                generatedDetails.push({
+                    type: 'removed',
+                    text: `Sem ${name}`,
+                    code: null
+                });
+            });
+
+            // 6. Monta Título Principal (Limpo)
+            let title = `Pizza ${CURRENT_PIZZA_BUILD.size.name}`;
+            // Opcional: Adicionar sabores no título ou deixar só "Pizza Grande" para o KDS ler os detalhes
+            // Vamos manter o padrão do PDV: Título + Sabores básicos
+            title += `: ${flavorNamesTitle.join(' / ')}`;
+            
+            if (CURRENT_PIZZA_BUILD.edge) {
+                title += ` (Borda: ${CURRENT_PIZZA_BUILD.edge.name})`;
+            }
+
+            const obsText = document.getElementById('pb-obs') ? document.getElementById('pb-obs').value : '';
+
+            // 7. ENVIA PARA O CARRINHO
+            CART.push({
+                type: 'pizza',
+                title: title,
+                price: CURRENT_PIZZA_BUILD.finalPrice,
+                quantity: 1,
+                
+                // Dados Técnicos
+                parts: cleanPartsNames,
+                parts_rich: partsRich,
+                
+                // Dados Visuais (O Segredo do KDS Bonito)
+                details: generatedDetails,
+                
+                removed_ingredients: removedIds,
+                removed_names: removedNames,
+                observation: obsText,
+                
+                // Flags de KDS
+                kds_stage: 0,
+                kds_done: false
+            });
+
+            updateCartBadge();
+            closePizzaBuilder();
+            
+            const Toast = Swal.mixin({ toast: true, position: 'bottom', showConfirmButton: false, timer: 1000, background: '#10b981', color: '#fff' });
+            Toast.fire({ icon: 'success', title: 'Adicionado!' });
+        }
+        
+        function updateFlavorCount() { document.getElementById('pb-flavor-count').innerText = CURRENT_PIZZA_BUILD.flavors.length; }
+        function selectEdge(radio) {
+            if (radio.value === "0") CURRENT_PIZZA_BUILD.edge = null;
+            else CURRENT_PIZZA_BUILD.edge = { id: radio.value, name: radio.dataset.name, price: parseFloat(radio.dataset.price) };
+            updatePizzaTotal();
+        }
+        
+
+        function updateCartBadge() {
+            const count = CART.reduce((acc, item) => acc + item.quantity, 0);
+            const total = CART.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+            const badge = document.getElementById('cartBadge');
+            if (badge) {
+                badge.innerText = count;
+                badge.classList.remove('scale-0');
+                if (count === 0) badge.classList.add('scale-0');
+            }
+            const bar = document.getElementById('bottomBar');
+            const lblTotal = document.getElementById('lblTotalBar');
+            const badgeCount = document.getElementById('badgeCount');
+            if (lblTotal) lblTotal.innerText = `R$ ${total.toFixed(2)}`;
+            if (badgeCount) badgeCount.innerText = count;
+            if (bar) {
+                if (count > 0) bar.classList.remove('hidden');
+                else bar.classList.add('hidden');
+            }
+        }
+
+        function openPreview() {
+            if (CART.length === 0) return Swal.fire({ toast: true, text: 'Carrinho vazio', icon: 'info', position: 'top' });
+            
+            const list = document.getElementById('previewList');
+            if (!list) return;
+            
+            list.innerHTML = '';
+            let total = 0;
+            
+            CART.forEach((item, index) => {
+                total += item.price * item.quantity;
+                
+                // --- RENDERIZAÇÃO ESTILO KDS ---
+                let detailsHtml = '';
+                
+                if (item.details && item.details.length > 0) {
+                    item.details.forEach(det => {
+                        let txt = (det.text || det).trim();
+                        const type = det.type || 'info';
+                        
+                        // Limpeza visual
+                        txt = txt.replace(/^[•\+\-]\s?/, '').replace(/^\d+\/\d+\s?/, '').trim();
+                        
+                        // A. SABORES
+                        if (type === 'flavor' || det.text.startsWith('•')) {
+                            const flavorName = txt.split('(')[0].trim();
+                            const mt = detailsHtml === '' ? '' : 'mt-2';
+                            detailsHtml += `
+                                <div class="${mt} text-sm text-white font-bold border-l-4 border-indigo-500 pl-2 leading-tight">
+                                    ${flavorName}
+                                </div>`;
+                        } 
+                        // B. ADICIONAIS (Verde)
+                        else if (type === 'addon' || det.text.startsWith('+')) {
+                            const clean = txt.replace(/\(|\)/g, '');
+                            detailsHtml += `
+                                <div class="text-xs text-green-400 font-bold ml-4 mt-0.5 flex items-center">
+                                    <i class="fas fa-plus text-[8px] mr-1 opacity-70"></i> ${clean}
+                                </div>`;
+                        }
+                        // C. REMOÇÕES (Vermelho)
+                        else if (type === 'removed' || det.text.startsWith('Sem ')) {
+                            const clean = txt.replace('Sem ', '').replace(/\(|\)/g, '');
+                            detailsHtml += `
+                                <div class="text-xs text-red-400 font-bold ml-4 mt-0.5 flex items-center">
+                                    <i class="fas fa-ban text-[8px] mr-1 opacity-70"></i> Sem ${clean}
+                                </div>`;
+                        }
+                        // D. BORDAS (Laranja)
+                        else if (type === 'edge' || txt.includes('🧀') || txt.includes('Borda:')) {
+                            const clean = txt.replace('🧀', '').replace('Borda:', '').replace(/\(|\)/g, '').trim();
+                            detailsHtml += `
+                                <div class="mt-2 pt-1 border-t border-slate-600/50 text-xs text-orange-400 font-black flex items-center gap-1 ml-1">
+                                    <i class="fas fa-ring"></i> Borda: ${clean}
+                                </div>`;
+                        }
+                        else {
+                            detailsHtml += `<div class="text-xs text-slate-400 ml-2 mt-0.5">${txt}</div>`;
+                        }
+                    });
+                }
+                
+                // Observação do Item
+                if (item.observation) {
+                    detailsHtml += `
+                        <div class="mt-2 bg-yellow-900/20 text-yellow-500 border border-yellow-600/30 p-1.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-start gap-1">
+                            <i class="fas fa-comment-alt mt-0.5"></i> ${item.observation}
+                        </div>`;
+                }
+                
+                // Fallback para itens simples sem details
+                if ((!item.details || item.details.length === 0) && item.removed_ingredients && item.removed_ingredients.length > 0) {
+                     detailsHtml += `<div class="text-xs text-red-400 font-bold ml-2"><i class="fas fa-minus-circle mr-1"></i> Retirar ingredientes selecionados</div>`;
+                }
+
+                // Limpa título se for Pizza (remove a tripa do nome)
+                let displayTitle = item.title;
+                if ((item.type === 'pizza') && displayTitle.includes(':')) {
+                    displayTitle = displayTitle.split(':')[0].trim();
+                }
+
+                list.innerHTML += `
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="text-sm font-black text-white leading-snug mb-1">${displayTitle}</div>
+                        <div class="flex flex-col">${detailsHtml}</div>
+                        <div class="text-xs text-slate-500 mt-2 font-mono bg-black/20 inline-block px-2 py-0.5 rounded">${item.quantity}x R$ ${item.price.toFixed(2)}</div>
+                    </div>
+                    <button onclick="removeFromCart(${index})" class="text-red-400 p-2 ml-2 bg-slate-800 rounded-lg border border-slate-700 hover:bg-red-900/20"><i class="fas fa-trash"></i></button>
+                </div>`;
+            });
+            
+            const tNum = document.getElementById('reviewTableNum');
+            if (tNum) tNum.innerText = CURRENT_TABLE;
+            
+            const tTotal = document.getElementById('previewTotal');
+            if (tTotal) tTotal.innerText = `R$ ${total.toFixed(2)}`;
+            
+            document.getElementById('previewModal').classList.remove('hidden');
+        }
+
+        function closePreview() { document.getElementById('previewModal').classList.add('hidden'); }
+        function removeFromCart(index) {
+            CART.splice(index, 1);
+            if (CART.length === 0) closePreview(); else openPreview();
+            updateCartBadge();
+        }
+
+        async function sendOrderToKitchen() {
+            const btn = document.getElementById('btnSend');
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> ENVIANDO...';
+            btn.disabled = true;
+
+            const fd = new FormData();
+            fd.append('delivery_type', 'balcao');
+            fd.append('table_number', CURRENT_TABLE);
+            fd.append('customer_name', `Mesa ${CURRENT_TABLE}`);
+            fd.append('payment_method', 'Em Aberto');
+            fd.append('items_json', JSON.stringify(CART));
+            fd.append('address_street', 'Local');
+            fd.append('address_number', '0');
+            fd.append('address_neighborhood', 'Salao');
+
+            if (EXISTING_ORDER_ID) {
+                fd.append('order_id', EXISTING_ORDER_ID);
+                try {
+                    const resList = await fetch('/admin/api/orders/list?tab=mesas');
+
+                    // --- CORREÇÃO AQUI ---
+                    const data = await resList.json();
+                    const orders = data.orders || [];
+                    // ---------------------
+
+                    const currentOrder = orders.find(o => o.id == EXISTING_ORDER_ID);
+                    if (currentOrder) {
+                        const oldItems = currentOrder.items || [];
+                        const finalItems = [...oldItems, ...CART];
+                        fd.set('items_json', JSON.stringify(finalItems));
+                    }
+                } catch (e) { }
+            }
+
+            try {
+                const res = await fetch('/admin/orders/save', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success', title: 'Sucesso!', text: 'Pedido enviado para produção.',
+                        timer: 1500, showConfirmButton: false, background: '#1e293b', color: '#fff'
+                    }).then(() => { window.location.reload(); });
+                } else { throw new Error(data.message); }
+            } catch (e) {
+                Swal.fire('Erro', 'Falha ao enviar.', 'error');
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> ENVIAR P/ COZINHA';
+                btn.disabled = false;
+            }
+        }
+
+        function goToTables() {
+            toggleDrawer();
+            closeTable();
+        }
+
+        async function showTableSummary() {
+            toggleDrawer();
+            if (!EXISTING_ORDER_ID) return Swal.fire('Mesa Vazia', 'Nenhum pedido enviado para a cozinha ainda.', 'info');
+
+            Swal.fire({ title: 'Buscando consumo...', didOpen: () => Swal.showLoading(), background: '#1e293b', color: '#fff' });
+
+            try {
+                const res = await fetch('/admin/api/orders/list?tab=mesas');
+                const data = await res.json();
+                const orders = data.orders || [];
+                const order = orders.find(o => o.id == EXISTING_ORDER_ID);
+
+                if (!order || !order.items || order.items.length === 0) {
+                    return Swal.fire({ title: 'Mesa Vazia', text: 'Nada consta no sistema.', icon: 'info', background: '#1e293b', color: '#fff' });
+                }
+
+                let html = '<div class="text-left space-y-3 max-h-[60vh] overflow-y-auto custom-scroll pr-1">';
+                
+                order.items.forEach(item => {
+                    let detailsHtml = '';
+                    
+                    // Usa a estrutura rica vinda do backend (normalizer)
+                    if (item.details && item.details.length > 0) {
+                        item.details.forEach(det => {
+                            let txt = (det.text || det).toString().trim();
+                            const type = det.type || 'info';
+                            
+                            // Limpeza
+                            txt = txt.replace(/^[•\+\-]\s?/, '').replace(/^\d+\/\d+\s?/, '').trim();
+                            
+                            if (type === 'flavor' || det.text.startsWith('•')) {
+                                const flavorName = txt.split('(')[0].trim();
+                                const mt = detailsHtml === '' ? '' : 'mt-2';
+                                detailsHtml += `<div class="${mt} text-[11px] text-white font-bold border-l-2 border-indigo-500 pl-2 leading-tight">${flavorName}</div>`;
+                            } 
+                            else if (type === 'addon' || det.text.startsWith('+')) {
+                                detailsHtml += `<div class="text-[10px] text-green-400 font-bold ml-3 mt-0.5">+ ${txt.replace(/\(|\)/g, '')}</div>`;
+                            }
+                            else if (type === 'removed' || det.text.startsWith('Sem ')) {
+                                detailsHtml += `<div class="text-[10px] text-red-400 font-bold ml-3 mt-0.5">- Sem ${txt.replace('Sem ', '').replace(/\(|\)/g, '')}</div>`;
+                            }
+                            else if (type === 'edge' || txt.includes('Borda')) {
+                                detailsHtml += `<div class="mt-2 text-[10px] text-orange-400 font-black border-t border-slate-600/50 pt-1 ml-1">Borda: ${txt.replace('🧀', '').replace('Borda:', '').trim()}</div>`;
+                            }
+                        });
+                    }
+                    
+                    if (item.observation) {
+                        detailsHtml += `<div class="mt-1 bg-yellow-900/20 text-yellow-500 p-1 rounded text-[9px] font-bold uppercase"><i class="fas fa-comment-alt mr-1"></i> ${item.observation}</div>`;
+                    }
+                    
+                    // Limpa título
+                    let displayTitle = item.title || item.name;
+                    if ((item.type === 'pizza' || item.is_pizza) && displayTitle.includes(':')) {
+                        displayTitle = displayTitle.split(':')[0].trim();
+                    }
+
+                    html += `
+                        <div class="flex justify-between items-start border-b border-slate-700 pb-2 border-dashed last:border-0">
+                            <div class="flex-1">
+                                <span class="text-white block font-black text-xs mb-1"><span class="text-slate-400 font-normal mr-1">${parseInt(item.quantity)}x</span> ${displayTitle}</span>
+                                <div class="flex flex-col">${detailsHtml}</div>
+                            </div>
+                            <span class="font-mono text-slate-300 text-xs whitespace-nowrap ml-2 font-bold">R$ ${(item.price * item.quantity).toFixed(2)}</span>
+                        </div>`;
+                });
+                
+                html += '</div>';
+                
+                // Adiciona totais
+                html += `
+                <div class="mt-4 pt-3 border-t border-slate-600 flex justify-between items-center">
+                    <span class="text-slate-400 font-bold uppercase text-xs">Total Parcial</span>
+                    <span class="text-xl font-bold text-green-400">R$ ${order.total.toFixed(2)}</span>
+                </div>`;
+
+                Swal.fire({
+                    title: `Resumo Mesa ${CURRENT_TABLE}`,
+                    html: html,
+                    background: '#1e293b',
+                    color: '#fff',
+                    showConfirmButton: true,
+                    confirmButtonText: 'OK',
+                    confirmButtonColor: '#4f46e5',
+                    width: '600px'
+                });
+            } catch (e) {
+                console.error(e);
+                Swal.fire({ title: 'Erro', text: 'Falha ao carregar conta.', icon: 'error', background: '#1e293b', color: '#fff' });
+            }
+        }
+
+        function filterBuilderFlavors() {
+            const term = document.getElementById('pb-search-flavor').value.toLowerCase().trim();
+            const items = document.querySelectorAll('.flavor-item-wrapper');
+            
+            items.forEach(item => {
+                const nameEl = item.querySelector('.flavor-name'); 
+                if(nameEl) {
+                    // CORREÇÃO: Usar 'textContent' em vez de 'innerText'
+                    // innerText retorna vazio para elementos ocultos, o que quebrava a busca
+                    const name = nameEl.textContent.toLowerCase();
+                    
+                    if (name.includes(term)) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        async function requestBill() {
+            if (!CURRENT_TABLE) return;
+
+            // Pergunta de confirmação
+            const result = await Swal.fire({
+                title: `Pedir conta da Mesa ${CURRENT_TABLE}?`,
+                text: "Isso avisará o caixa que a mesa deseja pagar.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#f59e0b', // Amarelo
+                cancelButtonColor: '#334155',
+                confirmButtonText: 'Sim, Solicitar',
+                cancelButtonText: 'Voltar',
+                background: '#1e293b', color: '#fff'
+            });
+
+            if (result.isConfirmed) {
+                // Feedback visual de carregamento
+                const btn = event.currentTarget; // Pega o botão clicado
+                const oldHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+                
+                try {
+                    const res = await fetch(`/api/waiter/request-bill/${CURRENT_TABLE}`, { method: 'POST' });
+                    const data = await res.json();
+                    
+                    if(res.ok) {
+                        Swal.fire({
+                            toast: true, position: 'top-end',
+                            icon: 'success', title: 'Solicitado!', text: 'O caixa foi notificado.',
+                            showConfirmButton: false, timer: 2000,
+                            background: '#1e293b', color: '#fff'
+                        });
+                    } else {
+                        Swal.fire('Erro', data.message, 'error');
+                    }
+                } catch(e) {
+                    Swal.fire('Erro', 'Falha na conexão', 'error');
+                } finally {
+                    btn.innerHTML = oldHtml;
+                }
+            }
+        }
+
+    </script>
+</body>
+
+</html>

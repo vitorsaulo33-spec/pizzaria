@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDS - ALIV</title>
+    <link href="/static/css/style.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            /* <--- ADICIONE ISSO PARA AFINAR A FONTE */
+            -moz-osx-font-smoothing: grayscale;
+            /* <--- E ISSO */
+        }
+
+        .card-enter {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Cores por Tamanho (Personalizável) */
+        .border-size-Pequena,
+        .border-size-Broto {
+            border-left: 5px solid #22c55e;
+        }
+
+        /* Verde */
+        .border-size-Media {
+            border-left: 5px solid #f59e0b;
+        }
+
+        /* Laranja */
+        .border-size-Grande {
+            border-left: 5px solid #ef4444;
+        }
+
+        /* Vermelho */
+        .border-size-Gigante,
+        .border-size-Familia {
+            border-left: 5px solid #a855f7;
+        }
+
+        /* Roxo */
+
+        .obs-blink {
+            animation: blink 2s infinite;
+            color: #facc15;
+            font-weight: bold;
+        }
+
+        @keyframes blink {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Animação de Alerta para Quantidade > 1 */
+        @keyframes blink-alert {
+
+            0%,
+            100% {
+                background-color: #334155;
+                transform: scale(1);
+            }
+
+            /* Cor padrão slate-700 */
+            50% {
+                background-color: #ef4444;
+                transform: scale(1.1);
+            }
+
+            /* Vermelho e cresce um pouco */
+        }
+
+        .qty-alert {
+            animation: blink-alert 1.5s infinite ease-in-out;
+            border-color: #f87171 !important;
+            /* Borda vermelha clara */
+            color: white !important;
+            font-weight: 900 !important;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    {% if mode == 'select' %}
+    <div class="h-screen flex flex-col items-center justify-center space-y-8">
+        <h1 class="text-4xl font-bold text-slate-300">Selecione o Setor</h1>
+
+        <div id="sectors-container" class="flex flex-wrap justify-center gap-6">
+        </div>
+
+        <script>
+            async function loadSectors() {
+                try {
+                    const res = await fetch('/admin/api/sectors');
+                    const sectors = await res.json();
+                    const container = document.getElementById('sectors-container');
+
+                    if (sectors.length === 0) {
+                        sectors.push({ id: 0, name: 'Cozinha Geral', has_expedition: true });
+                    }
+
+                    container.innerHTML = ''; // Limpa antes de adicionar
+
+                    sectors.forEach(s => {
+                        // Lógica Visual:
+                        // Se TEM expedição: Mostra Produção (Laranja) E Expedição (Azul)
+                        // Se NÃO TEM (Bar): Mostra APENAS Produção (Laranja - que vai servir como Finalizador)
+
+                        let buttonsHtml = '';
+
+                        // Botão de Produção (Sempre existe)
+                        buttonsHtml += `
+                            <a href="/kds/kitchen?sector=${s.id}" class="w-full py-3 bg-orange-600/20 hover:bg-orange-600 border border-orange-500 rounded-lg text-orange-300 hover:text-white font-bold transition flex items-center justify-center gap-2">
+                                <i class="fas fa-fire"></i> Produção / Bar
+                            </a>`;
+
+                        // Botão de Expedição (Só se configurado)
+                        if (s.has_expedition) {
+                            buttonsHtml += `
+                            <a href="/kds/expedition?sector=${s.id}" class="w-full py-3 bg-blue-600/20 hover:bg-blue-600 border border-blue-500 rounded-lg text-blue-300 hover:text-white font-bold transition flex items-center justify-center gap-2">
+                                <i class="fas fa-box-open"></i> Expedição
+                            </a>`;
+                        }
+
+                        container.innerHTML += `
+                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 w-72 text-center shadow-xl">
+                            <h2 class="text-2xl font-bold text-white mb-6 border-b border-slate-700 pb-4">${s.name}</h2>
+                            <div class="space-y-3">
+                                ${buttonsHtml}
+                            </div>
+                        </div>`;
+                    });
+                } catch (e) {
+                    console.error("Erro ao carregar setores:", e);
+                }
+            }
+            loadSectors();
+        </script>
+
+        <a href="/admin/dashboard" class="text-slate-500 hover:text-white mt-8">Voltar ao Admin</a>
+    </div>
+    {% else %}
+    <div class="h-screen flex flex-col">
+        <div class="h-20 bg-slate-900 border-b border-slate-800 flex justify-between items-center px-6 shadow-md z-10">
+
+            <div class="flex items-center gap-4">
+                <a href="/kds" class="text-slate-500 hover:text-white"><i class="fas fa-arrow-left"></i></a>
+                <h1 class="text-xl font-bold uppercase tracking-wider flex items-center gap-2 text-slate-200">
+                    {% if mode == 'kitchen' %} <i class="fas fa-fire text-orange-500"></i> COZINHA {% else %} <i
+                        class="fas fa-box-open text-blue-500"></i> EXPEDIÇÃO {% endif %}
+                </h1>
+            </div>
+
+            <div class="flex gap-4">
+                <div
+                    class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-1 flex flex-col items-center min-w-[90px]">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase">Na Tela</span>
+                    <span class="text-2xl font-bold text-white leading-none" id="kds-count-total">0</span>
+                </div>
+
+                <div
+                    class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-1 flex flex-col items-center min-w-[90px]">
+                    <span class="text-[10px] text-green-400 font-bold uppercase">No Prazo</span>
+                    <span class="text-2xl font-bold text-green-400 leading-none" id="kds-count-ok">0</span>
+                </div>
+
+                <div
+                    class="bg-slate-800 border border-red-900/50 rounded-lg px-4 py-1 flex flex-col items-center min-w-[90px] shadow-[0_0_10px_rgba(239,68,68,0.1)]">
+                    <span class="text-[10px] text-red-400 font-bold uppercase flex items-center gap-1">
+                        <i class="fas fa-clock"></i> Atrasados
+                    </span>
+                    <span class="text-2xl font-bold text-red-500 leading-none" id="kds-count-late">0</span>
+                </div>
+            </div>
+
+            <button onclick="openHistoryModal()"
+                class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-4 py-2 rounded-lg border border-slate-600 font-bold text-xs flex items-center gap-2 transition">
+                <i class="fas fa-history"></i> <span class="hidden md:inline">Últimos Finalizados</span>
+            </button>
+
+            <div class="text-2xl font-mono font-bold text-slate-500" id="clock">--:--</div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto overflow-x-hidden p-6 custom-scroll bg-slate-900">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20" id="kds-grid">
+                <div class="col-span-3 flex flex-col items-center justify-center h-96 text-slate-600 animate-pulse">
+                    <i class="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
+                    <span class="text-lg font-medium">Carregando pedidos...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalRecipe" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4">
+        <div
+            class="bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-600 shadow-2xl relative">
+            <button onclick="document.getElementById('modalRecipe').classList.add('hidden')"
+                class="absolute top-4 right-4 text-white text-2xl hover:text-red-400"><i
+                    class="fas fa-times"></i></button>
+            <div class="p-6 flex gap-6 h-full">
+                <div class="w-1/2 flex items-center justify-center bg-black/40 rounded-xl overflow-hidden">
+                    <img id="recImg" src="" class="max-w-full max-h-full object-contain"
+                        onerror="this.style.display='none'">
+                    <i id="recNoImg" class="fas fa-image text-6xl text-slate-700 hidden"></i>
+                </div>
+                <div class="w-1/2 overflow-y-auto">
+                    <h2 class="text-3xl font-bold text-white mb-2" id="recName">--</h2>
+                    <p id="recDesc"
+                        class="text-slate-400 text-sm mb-6 italic border-l-4 border-indigo-500 pl-3 bg-slate-900/30 p-2 rounded-r-lg">
+                        Carregando...
+                    </p>
+                    <div class="space-y-4">
+                        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                            <h4 class="text-orange-400 font-bold uppercase text-xs mb-2">Ingredientes</h4>
+                            <ul class="text-sm space-y-1 text-slate-300" id="recIngredients"></ul>
+                        </div>
+                        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                            <h4 class="text-blue-400 font-bold uppercase text-xs mb-2">Modo de Preparo</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap" id="recMethod">--</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalCheck" class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-xl w-full max-w-lg border border-slate-600 shadow-2xl p-6">
+            <h3 class="text-2xl font-bold text-white mb-1">Conferência Final</h3>
+            <p class="text-slate-400 text-sm mb-6">Confirme os itens antes de liberar.</p>
+
+            <div id="checklistItems" class="space-y-3 mb-6 max-h-[50vh] overflow-y-auto"></div>
+
+            <input type="hidden" id="checkOrderId">
+            <input type="hidden" id="checkSectorId">
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="document.getElementById('modalCheck').classList.add('hidden')"
+                    class="bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-bold">CANCELAR</button>
+                <button onclick="confirmAdvance()" id="btnConfirmCheck" disabled
+                    class="bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-lg font-bold shadow-lg shadow-green-900/50">
+                    {% if mode == 'kitchen' %} PRONTO P/ FORNO {% else %} FINALIZAR {% endif %}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalLabel" class="fixed inset-0 bg-black/95 z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-sm border border-slate-600 shadow-2xl p-6 text-center">
+
+            <div class="mb-4">
+                <div
+                    class="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3 text-white text-2xl">
+                    <i class="fas fa-print"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-1" id="lblTitle">Imprimir Etiqueta?</h3>
+                <p class="text-slate-400 text-sm mb-4">Pedido <span id="lblOrderNum"
+                        class="text-yellow-400 font-mono font-bold">#--</span></p>
+            </div>
+
+            <div
+                class="flex items-center justify-center gap-4 mb-8 bg-slate-900/50 p-3 rounded-xl border border-slate-700">
+                <button onclick="adjustLabelQty(-1)"
+                    class="w-10 h-10 bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-bold">-</button>
+                <div class="text-center">
+                    <span id="lblQty" class="text-3xl font-bold text-white block leading-none">1</span>
+                    <span class="text-[10px] text-slate-500 uppercase font-bold">Cópia(s)</span>
+                </div>
+                <button onclick="adjustLabelQty(1)"
+                    class="w-10 h-10 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-bold">+</button>
+            </div>
+
+            <div class="space-y-3">
+                <button onclick="confirmPrintAndFinish()" id="btnPrintFinish"
+                    class="w-full py-4 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 text-lg">
+                    <i class="fas fa-print"></i> IMPRIMIR E FINALIZAR
+                </button>
+
+                <button onclick="justFinish()" id="btnJustFinish"
+                    class="w-full py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold border border-slate-600 flex items-center justify-center gap-2">
+                    <i class="fas fa-check"></i> Apenas Finalizar (Sem Imprimir)
+                </button>
+
+                <button onclick="document.getElementById('modalLabel').classList.add('hidden')" id="btnCancelPrint"
+                    class="text-slate-500 hover:text-white text-xs mt-2 underline">
+                    Voltar / Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalHistoryKDS" class="fixed inset-0 bg-black/90 z-[70] hidden flex items-center justify-center p-4">
+        <div
+            class="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-600 shadow-2xl flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-700 bg-slate-900 flex justify-between items-center rounded-t-2xl">
+                <h3 class="font-bold text-white"><i class="fas fa-history text-indigo-400 mr-2"></i> Últimos Finalizados
+                </h3>
+                <button onclick="document.getElementById('modalHistoryKDS').classList.add('hidden')"
+                    class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scroll p-2 space-y-2" id="kdsHistoryList">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MODE = "{{ mode }}";
+        let LAST_DATA_JSON = ""; // Variável essencial para atualização
+
+        let CURRENT_LABEL_ORDER_ID = null;
+        let LABEL_QTY = 1;
+
+        let PENDING_FINISH_ID = null; // Armazena o ID se estivermos no fluxo de finalizar
+        let PENDING_SECTOR_ID = null;
+
+        function openLabelModal(id, wabizId, isFinishingFlow = false, sectorId = null) {
+            CURRENT_LABEL_ORDER_ID = id;
+            LABEL_QTY = 1;
+            document.getElementById('lblOrderNum').innerText = '#' + wabizId.replace('M-', '');
+            document.getElementById('lblQty').innerText = '1';
+
+            // Configura o estado
+            if (isFinishingFlow) {
+                PENDING_FINISH_ID = id;
+                PENDING_SECTOR_ID = sectorId;
+                document.getElementById('lblTitle').innerText = "Pedido Conferido!";
+                document.getElementById('btnPrintFinish').innerHTML = '<i class="fas fa-print"></i> IMPRIMIR E FINALIZAR';
+                document.getElementById('btnJustFinish').classList.remove('hidden');
+                document.getElementById('btnCancelPrint').innerText = "Voltar (Não Finalizar)";
+            } else {
+                // Modo apenas impressão (histórico ou botão pequeno)
+                PENDING_FINISH_ID = null;
+                PENDING_SECTOR_ID = null;
+                document.getElementById('lblTitle').innerText = "Reimpressão";
+                document.getElementById('btnPrintFinish').innerHTML = '<i class="fas fa-print"></i> IMPRIMIR AGORA';
+                document.getElementById('btnJustFinish').classList.add('hidden'); // Esconde opção de finalizar
+                document.getElementById('btnCancelPrint').innerText = "Fechar";
+            }
+
+            document.getElementById('modalLabel').classList.remove('hidden');
+        }
+
+        function adjustLabelQty(delta) {
+            LABEL_QTY += delta;
+            if (LABEL_QTY < 1) LABEL_QTY = 1;
+            document.getElementById('lblQty').innerText = LABEL_QTY;
+        }
+
+        function configPrinterIp() {
+            const current = localStorage.getItem('aliv_printer_ip') || '127.0.0.1';
+            const ip = prompt("IP do computador da impressora Zebra:", current);
+            if (ip) localStorage.setItem('aliv_printer_ip', ip);
+        }
+
+        async function confirmPrintLabel() {
+            // 1. CORREÇÃO: O ID do botão agora é 'btnPrintFinish'
+            const btn = document.getElementById('btnPrintFinish');
+
+            // Proteção para não quebrar se o botão não for encontrado
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> ...';
+            }
+
+            try {
+                // 1. Busca o ZPL do Backend
+                const resZpl = await fetch(`/api/kds/zpl/${CURRENT_LABEL_ORDER_ID}`);
+                const dataZpl = await resZpl.json();
+
+                if (!dataZpl.zpl) throw new Error("Erro ao gerar ZPL");
+
+                // 2. Repete o ZPL pela quantidade escolhida
+                let finalZpl = "";
+                for (let i = 0; i < LABEL_QTY; i++) {
+                    finalZpl += dataZpl.zpl;
+                }
+
+                // 3. Envia para o Agente Local
+                const printerIp = localStorage.getItem('aliv_printer_ip') || '127.0.0.1';
+                // Certifique-se que este nome é igual ao do Windows
+                const printerName = "ZDesigner ZD220-203dpi ZPL";
+
+                const payload = {
+                    printer_name: printerName,
+                    content: finalZpl
+                };
+
+                const resAgent = await fetch(`http://${printerIp}:5000/print`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (resAgent.ok) {
+                    const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, background: '#1e293b', color: '#fff' });
+                    Toast.fire({ icon: 'success', title: 'Enviado para Zebra!' });
+
+                    // --- CORREÇÃO DE FLUXO ---
+                    // Só fecha o modal manualmente se NÃO estiver finalizando o pedido.
+                    // Se estiver finalizando (PENDING_FINISH_ID existe), a função 'confirmPrintAndFinish' 
+                    // vai chamar o 'executeAdvance' logo em seguida, que fechará o modal.
+                    if (!PENDING_FINISH_ID) {
+                        document.getElementById('modalLabel').classList.add('hidden');
+                    }
+                } else {
+                    alert('Erro no Agente de Impressão. Verifique se o agente está rodando.');
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert('Falha ao imprimir etiqueta.');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    // Restaura o texto correto do botão dependendo do contexto
+                    if (PENDING_FINISH_ID) {
+                        btn.innerHTML = '<i class="fas fa-print"></i> IMPRIMIR E FINALIZAR';
+                    } else {
+                        btn.innerHTML = '<i class="fas fa-print"></i> IMPRIMIR AGORA';
+                    }
+                }
+            }
+        }
+
+        // Relógio
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }, 1000);
+
+        // --- WEBSOCKET REAL-TIME (Substitui o Polling) ---
+        let socket;
+        let reconnectInterval = 3000;
+
+        function connectWebSocket() {
+            // Cria conexão (protocolo ws:// ou wss:// se for https)
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/kds?token={{ access_token }}`;
+
+            console.log("🔌 Conectando ao KDS em tempo real...", wsUrl);
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = function () {
+                console.log("✅ KDS Conectado!");
+                // Carrega a primeira vez pra garantir
+                loadOrders();
+            };
+
+            socket.onmessage = function (event) {
+                console.log("🔔 Atualização recebida:", event.data);
+                // Quando o servidor diz "update" ou "new_order", recarregamos
+                loadOrders();
+
+                // Opcional: Tocar som se for pedido novo
+                if (event.data === "new_order") {
+                    // playSound(); // Implementar som se quiser
+                }
+            };
+
+            socket.onclose = function () {
+                console.warn("❌ KDS Desconectado. Tentando reconectar em 3s...");
+                setTimeout(connectWebSocket, reconnectInterval);
+            };
+
+            socket.onerror = function (err) {
+                console.error("Socket erro:", err);
+                socket.close();
+            };
+        }
+
+        // Inicia
+        loadOrders(); // Carga inicial
+        connectWebSocket(); // Conecta o Turbo
+
+        async function loadOrders() {
+            try {
+                // Pega o ID do setor da URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const sectorId = urlParams.get('sector');
+
+                // CORREÇÃO: Constrói a URL dinamicamente
+                let url = `/api/kds/orders?mode=${MODE}`;
+
+                // Só adiciona o parametro se ele existir e não for vazio
+                if (sectorId && sectorId.trim() !== '') {
+                    url += `&sector_id=${sectorId}`;
+                }
+
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("Erro API");
+                const data = await res.json();
+                renderCards(data);
+            } catch (e) {
+                console.error("Erro ao carregar pedidos:", e);
+            }
+        }
+
+        // --- NOVA FUNÇÃO DE LIMPEZA PROFUNDA ---
+        function stripHtmlAndDecode(input) {
+            if (!input) return "";
+            // 1. Cria um elemento temporário para decodificar caracteres especiais (ex: &lt; vira <)
+            var doc = new DOMParser().parseFromString(input, "text/html");
+            var decoded = doc.documentElement.textContent;
+
+            // 2. Remove qualquer tag HTML restante (ex: <div>, <b>)
+            return decoded.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+        }
+
+        function renderCards(orders) {
+            const grid = document.getElementById('kds-grid');
+            const newJson = JSON.stringify(orders);
+            if (newJson === LAST_DATA_JSON) return;
+            LAST_DATA_JSON = newJson;
+
+            // Atualiza HUD
+            const total = orders.length;
+            const late = orders.filter(o => o.elapsed > 25).length;
+            document.getElementById('kds-count-total').innerText = total;
+            document.getElementById('kds-count-ok').innerText = total - late;
+            document.getElementById('kds-count-late').innerText = late;
+
+            grid.innerHTML = '';
+
+            if (orders.length === 0) {
+                grid.innerHTML = '<div class="col-span-full flex flex-col items-center justify-center h-96 text-slate-500"><i class="fas fa-check-circle text-6xl mb-4 opacity-20"></i><span class="text-2xl font-light">Tudo limpo!</span></div>';
+                return;
+            }
+
+            orders.forEach(o => {
+                let itemsHtml = '';
+                let sizeBorderClass = 'border-slate-600';
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentSectorId = urlParams.get('sector') || '';
+                const btnClass = o.btn_action === 'finish'
+                    ? 'bg-green-600 hover:bg-green-500 text-white shadow-md shadow-green-900/20'
+                    : 'bg-orange-600 hover:bg-orange-500 text-white shadow-md shadow-orange-900/20';
+
+                // --- NOVO: IDENTIFICA A ORIGEM PARA EVITAR COLISÃO DE IDs ---
+                const isPDV = (o.platform === 'PDV' || o.platform === 'MANUAL');
+                // ------------------------------------------------------------
+
+                if (o.items && o.items.length > 0) {
+                    o.items.forEach((item, index) => {
+                        const displayName = item.name || "Item";
+                        const safeName = displayName.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+
+                        // IDs do Pai
+                        const itemExtCode = item.external_code || '';
+                        const itemId = item.id || '';
+
+                        const isLast = index === o.items.length - 1;
+                        const upperName = displayName.toUpperCase();
+                        if (upperName.includes('GIGANTE')) sizeBorderClass = 'border-purple-500';
+                        else if (upperName.includes('FAMÍLIA') || upperName.includes('FAMILIA')) sizeBorderClass = 'border-purple-500';
+                        else if (upperName.includes('GRANDE')) sizeBorderClass = 'border-red-500';
+                        else if (upperName.includes('MÉDIA') || upperName.includes('MEDIA')) sizeBorderClass = 'border-orange-500';
+                        else if (upperName.includes('PEQUENA') || upperName.includes('BROTO')) sizeBorderClass = 'border-green-500';
+
+                        // Detalhes (Sabores/Adicionais)
+                        let detailsHtml = '';
+                        if (item.details && item.details.length > 0) {
+                            item.details.forEach(det => {
+                                let text = "";
+                                let code = "";
+                                let type = "info";
+
+                                if (typeof det === 'object' && det !== null) {
+                                    text = det.text || "";
+                                    code = det.code || ""; // Pode ser ID (PDV) ou External (Wabiz)
+                                    type = det.type || "info";
+                                } else {
+                                    text = String(det);
+                                }
+
+                                const displayText = text.replace('🧀 ', '').replace('Borda:', '').replace('•', '').replace('+', '').trim();
+
+                                // === CORREÇÃO CRÍTICA DO CLIQUE NO DETALHE ===
+                                let detailClick = "";
+                                if (code) {
+                                    if (isPDV) {
+                                        // PDV: O código É um ID interno -> Manda no 3º parâmetro (product_id)
+                                        detailClick = `onclick="event.stopPropagation(); openRecipe('${displayText}', '', '${code}')"`;
+                                    } else {
+                                        // WABIZ/IFOOD: O código é EXTERNO -> Manda no 2º parâmetro (code)
+                                        // E deixamos o 3º VAZIO para o backend não achar que é ID de banco
+                                        detailClick = `onclick="event.stopPropagation(); openRecipe('${displayText}', '${code}', '')"`;
+                                    }
+                                } else {
+                                    // Se não tem código específico, usa o comportamento do pai
+                                    // Mas aplicamos a mesma regra de segurança do pai (ver abaixo)
+                                    if (isPDV) {
+                                        detailClick = `onclick="event.stopPropagation(); openRecipe('${displayText}', '', '${itemId}')"`;
+                                    } else {
+                                        detailClick = `onclick="event.stopPropagation(); openRecipe('${displayText}', '${itemExtCode}', '')"`;
+                                    }
+                                }
+                                // ============================================
+
+                                const cursorClass = "cursor-pointer hover:text-white transition-colors duration-200 hover:underline";
+
+                                if (text.includes('🧀') || text.toUpperCase().includes('BORDA:') || type === 'edge') {
+                                    detailsHtml += `
+                                    <div class="mt-2 pt-2 border-t border-dashed border-slate-700 flex items-center gap-2 ${cursorClass}" ${detailClick}>
+                                        <span class="text-orange-400 font-bold text-sm flex items-center gap-2">
+                                            <i class="fas fa-ring text-xs"></i> Borda: ${displayText}
+                                        </span>
+                                    </div>`;
+                                } else if (text.trim().startsWith('•') || type === 'flavor') {
+                                    detailsHtml += `<div class="text-slate-200 text-lg font-bold ml-1 mt-1 ${cursorClass}" ${detailClick}>${displayText}</div>`;
+                                } else if (text.trim().startsWith('+') || type === 'addon') {
+                                    detailsHtml += `<div class="text-green-400 text-sm ml-4 font-medium flex items-center gap-1 ${cursorClass}" ${detailClick}><i class="fas fa-plus text-[10px] opacity-50"></i> ${displayText}</div>`;
+                                } else {
+                                    detailsHtml += `<div class="text-slate-400 text-sm ml-2 pl-2 border-l border-slate-700 mt-0.5 ${cursorClass}" ${detailClick}>${text}</div>`;
+                                }
+                            });
+                        }
+
+                        // Remoções
+                        let removedHtml = '';
+                        if (item.removed && item.removed.length > 0) {
+                            item.removed.forEach(rem => {
+                                removedHtml += `<div class="inline-flex items-center gap-1 mt-2 bg-red-900/20 text-red-300 border border-red-500/20 px-2 py-1 rounded text-xs font-bold uppercase"><i class="fas fa-ban text-[10px]"></i> Sem ${rem}</div>`;
+                            });
+                        }
+
+                        let obsHtml = '';
+                        if (item.observation) {
+                            obsHtml += `<div class="mt-2 bg-yellow-500/10 border-l-2 border-yellow-500 px-3 py-1.5 rounded-r text-yellow-200 text-sm font-bold flex items-start gap-2"><i class="far fa-comment-alt mt-1 text-xs opacity-70"></i> <span>${item.observation}</span></div>`;
+                        }
+
+                        // --- CORREÇÃO DO CLIQUE NO ITEM PAI ---
+                        let mainClick = "";
+                        if (isPDV) {
+                            // PDV: Prioriza ID interno
+                            mainClick = `onclick="openRecipe('${safeName}', '', '${itemId}')"`;
+                        } else {
+                            // WABIZ/IFOOD: Prioriza Código Externo e IGNORA ID interno (que pode ser colisão)
+                            mainClick = `onclick="openRecipe('${safeName}', '${itemExtCode}', '')"`;
+                        }
+                        // --------------------------------------
+
+                        itemsHtml += `
+                        <div class="p-4 mb-2 bg-[#0f172a] rounded-lg border border-slate-700/50 hover:border-slate-500 transition cursor-pointer group relative shadow-inner" 
+                             ${mainClick}>
+                            
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 pt-0.5">
+                                    <div class="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1e293b] text-white border border-slate-600 font-black text-xl shadow-lg ${item.quantity > 1 ? "border-red-500 text-red-500 animate-pulse" : ""}">
+                                        ${parseInt(item.quantity)}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-white text-xl font-black leading-tight mb-2 tracking-wide hover:text-blue-400 transition underline-offset-4 hover:underline">
+                                        ${displayName}
+                                    </div>
+                                    
+                                    <div class="space-y-1">
+                                        ${detailsHtml}
+                                        ${removedHtml}
+                                        ${obsHtml}
+                                    </div>
+                                </div>
+                                
+                                <i class="fas fa-search text-slate-600 absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition text-sm"></i>
+                            </div>
+                        </div>`;
+                    });
+                }
+
+                // ... (O restante do código de renderização do card, badges e footer continua igual) ...
+                let typeBadge = o.type === 'MESA'
+                    ? `<span class="bg-orange-600 text-white border border-orange-400 text-xs font-bold px-2 py-1 rounded">MESA ${o.table || ''}</span>`
+                    : `<span class="bg-indigo-600 text-white border border-indigo-400 text-xs font-bold px-2 py-1 rounded">DELIVERY</span>`;
+
+                let platBadge = '';
+                if (o.platform === 'IFOOD') platBadge = '<span class="text-xs font-bold text-red-400 flex items-center gap-1"><i class="fas fa-motorcycle"></i> iFood</span>';
+                else if (o.platform === 'WABIZ') platBadge = '<span class="text-xs font-bold text-orange-400 flex items-center gap-1"><i class="fas fa-shopping-bag"></i> Wabiz</span>';
+                else platBadge = '<span class="text-xs font-bold text-slate-400 flex items-center gap-1"><i class="fas fa-desktop"></i> PDV</span>';
+
+                const timeClass = o.elapsed > 25 ? 'text-red-500 font-black animate-pulse text-2xl' : 'text-slate-300 font-bold text-xl';
+                const cardBg = o.elapsed > 40 ? 'bg-red-950/20 border-red-800' : 'bg-[#1e293b] border-slate-600';
+                const jsonSafe = JSON.stringify(o.items || []).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+
+                // --- CÓDIGO COMPLETO DO CARD (SUBSTITUA O SEU ATUAL POR ESTE) ---
+                grid.innerHTML += `
+                <div class="${cardBg} rounded-xl border-l-4 ${sizeBorderClass} shadow-xl flex flex-col card-enter overflow-hidden relative h-full transition-all duration-300 hover:shadow-2xl hover:border-slate-500" data-id="${o.id}">
+                    
+                    <div class="px-5 py-3 bg-[#0f172a] border-b border-slate-700 flex justify-between items-start">
+                        <div>
+                            <div class="text-xl font-bold text-white truncate leading-tight mb-1 tracking-wide max-w-[180px]" title="${o.customer}">
+                                ${o.customer}
+                            </div>
+                            
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                ${typeBadge}
+                                <span class="text-sm text-slate-500 font-mono font-bold">#${o.wabiz_id}</span>
+                                
+                                <button onclick="event.stopPropagation(); openLabelModal(${o.id}, '${o.wabiz_id}')" 
+                                        class="bg-slate-700 hover:bg-slate-600 text-slate-300 w-7 h-7 rounded flex items-center justify-center transition border border-slate-600" 
+                                        title="Imprimir Etiqueta">
+                                    <i class="fas fa-tag text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="text-right flex flex-col items-end">
+                            <div class="${timeClass} leading-none font-mono">${o.time}</div>
+                            <span class="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">${o.elapsed} MIN</span>
+                            <div class="mt-1">${platBadge}</div>
+                        </div>
+                    </div>
+
+                    ${o.obs ? `<div class="px-5 py-3 bg-red-900/30 border-b border-red-500/20 text-red-200 text-sm font-bold uppercase flex items-start gap-2"><i class="fas fa-exclamation-circle text-red-400 text-lg mt-0.5"></i> ${o.obs}</div>` : ''}
+                    
+                    <div class="flex-1 overflow-y-auto custom-scroll p-2">
+                        ${itemsHtml}
+                    </div>
+
+                    <div class="p-3 bg-[#0f172a] border-t border-slate-700 mt-auto">
+                        <button onclick='openChecklist(${o.id}, ${jsonSafe}, "${currentSectorId}")' 
+                                class="w-full py-4 rounded-xl font-bold text-base uppercase tracking-widest transition transform active:scale-95 flex items-center justify-center gap-2 ${btnClass}">
+                                ${o.btn_label}
+                        </button>
+                    </div>
+                </div>`;
+            });
+        }
+
+
+        // --- FUNÇÃO CORRIGIDA PARA RECEBER ID INTERNO ---
+        async function openRecipe(itemName, itemCode = null, itemId = null) {
+            Swal.fire({ title: 'Buscando ficha...', didOpen: () => Swal.showLoading(), background: '#1e293b', color: '#fff' });
+            try {
+                let searchName = itemName.replace(/^\d+(\/\d+|½)?\s*/, '').trim();
+
+                // Monta a URL com os 3 parâmetros
+                // O backend vai dar prioridade total para 'product_id' se ele existir
+                const url = `/api/product-details?name=${encodeURIComponent(searchName)}&code=${itemCode || ''}&product_id=${itemId || ''}`;
+
+                const res = await fetch(url);
+                const data = await res.json();
+
+                Swal.close();
+
+                if (!data.found) return Swal.fire({ toast: true, icon: 'info', title: 'Ficha não encontrada', background: '#1e293b', color: '#fff' });
+
+                // Exibe nome limpo e dados
+                document.getElementById('recName').innerText = data.name;
+                document.getElementById('recDesc').innerText = data.description || "Sem descrição adicional.";
+                document.getElementById('recMethod').innerText = data.prep_method;
+
+                const list = document.getElementById('recIngredients');
+                list.innerHTML = '';
+
+                if (data.recipe && data.recipe.length > 0) {
+                    data.recipe.forEach(i => {
+                        list.innerHTML += `
+                        <li class="border-b border-slate-700/50 pb-2 mb-2 last:border-0 last:mb-0 text-base text-slate-300 flex items-start">
+                            <span class="text-indigo-500 mr-2 text-lg">•</span> 
+                            <span>${i}</span>
+                        </li>`;
+                    });
+                } else {
+                    list.innerHTML = '<li class="text-slate-500 italic">Sem ingredientes.</li>';
+                }
+
+                const img = document.getElementById('recImg');
+                const noImg = document.getElementById('recNoImg');
+                if (data.image) {
+                    img.src = data.image; img.style.display = 'block'; noImg.classList.add('hidden');
+                } else {
+                    img.style.display = 'none'; noImg.classList.remove('hidden');
+                }
+
+                document.getElementById('modalRecipe').classList.remove('hidden');
+            } catch (e) { Swal.close(); }
+        }
+
+        // --- CHECKLIST & SEGURANÇA (MODAL AZUL - VISUAL LEVE) ---
+        function openChecklist(id, items, sectorId) { // Adicionado sectorId
+            const list = document.getElementById('checklistItems');
+            list.innerHTML = '';
+            document.getElementById('checkOrderId').value = id;
+            document.getElementById('checkSectorId').value = sectorId || ''; // Salva o setor
+
+            // --- DETECÇÃO DE RISCO ---
+            const riskyItems = items.filter(i => (i.title && i.title.includes(':')) || (i.observation && i.observation.length > 0));
+            const isRisky = riskyItems.length > 0;
+
+            let alertHtml = "";
+
+            if (isRisky) {
+                const alerts = riskyItems.map(i => {
+                    let obsText = i.observation || "Nenhuma";
+                    let sizeText = "Padrão";
+
+                    // CORREÇÃO: Usa i.title com segurança
+                    if (i.title && i.title.includes(':')) {
+                        sizeText = i.title.split(':')[0].replace(/Pizza/gi, '').trim();
+                    }
+
+                    return `
+                    <li class="mb-3 border-b border-white/10 pb-3 last:border-0 last:pb-0 last:mb-0">
+                        <p class="text-slate-300 text-sm leading-relaxed font-normal">
+                            Confira: <span class="text-orange-400 font-bold uppercase">${sizeText}</span> 
+                            <span class="text-yellow-400 font-bold uppercase">${obsText}</span>
+                        </p>
+                    </li>`;
+                }).join('');
+
+                alertHtml = `
+                <div id="safetyGate" class="bg-[#1a0505] border border-red-800 rounded-lg p-4 mb-4 shadow-lg">
+                    <div class="flex items-center gap-2 mb-3 pb-2 border-b border-red-900/50">
+                        <i class="fas fa-hand-paper text-red-500 text-lg"></i>
+                        <h4 class="text-red-400 font-bold uppercase text-sm tracking-wide">Atenção Necessária</h4>
+                    </div>
+                    <ul class="list-none pl-0 mb-4">${alerts}</ul>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="document.getElementById('modalCheck').classList.add('hidden')" class="py-3 rounded font-medium text-sm bg-slate-800 text-slate-300 hover:text-white border border-slate-600">VOLTAR</button>
+                        <button onclick="unlockChecklist()" class="py-3 rounded font-medium text-sm bg-green-700 hover:bg-green-600 text-white shadow-md">CONFERIDO</button>
+                    </div>
+                </div>`;
+                list.innerHTML = alertHtml;
+            }
+
+            const containerClass = isRisky ? 'hidden' : '';
+            let checksHtml = `<div id="checkContainer" class="space-y-1 ${containerClass}">`;
+
+            items.forEach((item, idx) => {
+                // CORREÇÃO: Define displayTitle com segurança aqui dentro
+                let displayTitle = item.title || item.name || "Item";
+
+                // Limpeza do Nome (Remove HTML e Pizza Pizza)
+                let cleanTitle = displayTitle.replace(/<[^>]+>/g, '').replace(/PIZZA\s+PIZZA/gi, 'PIZZA').trim();
+
+                // Se for Header de Combo
+                if (item.is_header || cleanTitle.startsWith('COMBO:')) {
+                    cleanTitle = cleanTitle.replace('COMBO:', '').trim();
+                    checksHtml += `
+                    <div class="mt-4 mb-2 border-b border-yellow-500/30 pb-1">
+                        <span class="text-yellow-400 font-medium text-base uppercase tracking-wide">${cleanTitle}</span>
+                    </div>`;
+                    return; // Pula para o próximo
+                }
+
+                // Se for item filho (recua e deixa cinza)
+                const isChild = item.observation === 'Item do Combo';
+                const rowClass = isChild ? "pl-8 opacity-80" : "p-3 bg-slate-900 border border-slate-700 rounded-lg";
+                const textClass = isChild ? "text-slate-400 text-sm font-normal" : "text-slate-200 text-base font-medium";
+
+                // Detalhes (Sabores, Extras) - USANDO DETAILS (NOVO PADRÃO)
+                let detailsHtml = '';
+                if (item.details && item.details.length > 0) {
+                    item.details.forEach(det => {
+                        let txt = (det.text || det).toString();
+                        let type = det.type || 'info';
+
+                        let color = "text-slate-400";
+                        if (type === 'flavor' || txt.startsWith('•')) color = "text-slate-300 font-bold";
+                        if (type === 'addon' || txt.startsWith('+')) color = "text-green-400";
+                        if (type === 'edge' || txt.includes('Borda')) color = "text-orange-400";
+                        if (type === 'removed' || txt.startsWith('Sem')) color = "text-red-400";
+
+                        detailsHtml += `<div class="${color} text-xs ml-6 font-normal leading-tight mt-0.5">${txt}</div>`;
+                    });
+                }
+                // Fallback para display_lines antigo
+                else if (item.display_lines) {
+                    item.display_lines.forEach(line => {
+                        detailsHtml += `<div class="text-slate-400 text-xs ml-6 font-normal leading-tight mt-0.5">${line.text}</div>`;
+                    });
+                }
+
+                checksHtml += `
+                <label class="${rowClass} flex items-start gap-3 cursor-pointer hover:border-indigo-500 transition select-none mb-1">
+                    <input type="checkbox" class="chk-verify mt-1 w-4 h-4 rounded bg-slate-800 border-slate-500 text-green-500 focus:ring-0" onchange="validateChecklist()">
+                    <div class="flex-1">
+                        <div class="${textClass}">
+                            <span class="font-normal opacity-70 mr-1">${parseInt(item.quantity)}x</span> 
+                            ${cleanTitle}
+                        </div>
+                        ${detailsHtml}
+                    </div>
+                </label>`;
+            });
+            checksHtml += `</div>`;
+
+            if (!isRisky || list.innerHTML === '') list.innerHTML = checksHtml;
+            else list.innerHTML += checksHtml;
+
+            const btnConfirm = document.getElementById('btnConfirmCheck');
+            btnConfirm.disabled = true;
+            btnConfirm.classList.add('opacity-50', 'cursor-not-allowed');
+
+            if (isRisky) btnConfirm.classList.add('hidden');
+            else {
+                btnConfirm.classList.remove('hidden');
+                validateChecklist();
+            }
+
+            document.getElementById('modalCheck').classList.remove('hidden');
+        }
+
+        function unlockChecklist() {
+            const gate = document.getElementById('safetyGate');
+            if (gate) gate.classList.add('hidden'); // Remove o alerta
+
+            const container = document.getElementById('checkContainer');
+            if (container) container.classList.remove('hidden'); // Mostra os checks
+
+            const btn = document.getElementById('btnConfirmCheck');
+            btn.classList.remove('hidden');
+        }
+
+        function validateChecklist() {
+            const all = document.querySelectorAll('.chk-verify');
+            const checked = document.querySelectorAll('.chk-verify:checked');
+            const btn = document.getElementById('btnConfirmCheck');
+
+            if (all.length > 0 && all.length === checked.length) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.classList.add('animate-pulse');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                btn.classList.remove('animate-pulse');
+            }
+        }
+
+        async function confirmAdvance(id, sectorId) {
+            if (!id && document.getElementById('checkOrderId')) {
+                id = document.getElementById('checkOrderId').value;
+            }
+            if (!sectorId) {
+                sectorId = document.getElementById('checkSectorId').value;
+            }
+
+            // --- INTERCEPTAÇÃO DO FLUXO (SÓ EXPEDIÇÃO) ---
+            if (MODE === 'expedition') {
+                // Fecha o modal de checklist primeiro
+                document.getElementById('modalCheck').classList.add('hidden');
+
+                // Busca o display ID para mostrar no modal (gambiarra rápida pegando do DOM ou buscando API)
+                // Vamos tentar pegar do card na tela se possível, ou usar um placeholder
+                let displayId = "--";
+                const card = document.querySelector(`div[data-id="${id}"]`);
+                if (card) {
+                    const idSpan = card.querySelector('.font-mono'); // Geralmente onde fica o ID
+                    if (idSpan) displayId = idSpan.innerText.replace('#', '');
+                }
+
+                // ABRE O MODAL DE IMPRESSÃO EM MODO FINALIZAÇÃO
+                openLabelModal(id, displayId, true, sectorId);
+                return; // PARA AQUI! Não chama a API de advance ainda.
+            }
+            // ----------------------------------------------
+
+            // Fluxo Normal (Cozinha): Finaliza direto
+            executeAdvance(id, sectorId);
+        }
+
+        // Função que realmente chama a API (Separada para reuso)
+        async function executeAdvance(id, sectorId) {
+            try {
+                const res = await fetch(`/api/kds/advance/${id}?current_status=${MODE}&sector_id=${sectorId || ''}`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('modalCheck').classList.add('hidden');
+                    document.getElementById('modalLabel').classList.add('hidden');
+                    loadOrders();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+
+        async function confirmPrintAndFinish() {
+            // 1. Imprime
+            await confirmPrintLabel();
+
+            // 2. Se estiver em fluxo de finalização, avança o status
+            if (PENDING_FINISH_ID) {
+                await executeAdvance(PENDING_FINISH_ID, PENDING_SECTOR_ID);
+            }
+        }
+
+        async function justFinish() {
+            if (PENDING_FINISH_ID) {
+                await executeAdvance(PENDING_FINISH_ID, PENDING_SECTOR_ID);
+            }
+        }
+
+
+        async function openHistoryModal() {
+            const list = document.getElementById('kdsHistoryList');
+            list.innerHTML = '<div class="text-center py-4 text-slate-500"><i class="fas fa-circle-notch fa-spin"></i> Carregando...</div>';
+            document.getElementById('modalHistoryKDS').classList.remove('hidden');
+
+            try {
+                const res = await fetch('/api/kds/history');
+                const data = await res.json();
+                list.innerHTML = '';
+
+                if (data.length === 0) {
+                    list.innerHTML = '<div class="text-center py-4 text-slate-500">Nenhum histórico recente.</div>';
+                    return;
+                }
+
+                data.forEach(o => {
+                    const cleanId = o.wabiz_id ? o.wabiz_id.replace('M-', '') : o.id;
+
+                    // --- LÓGICA DE RENDERIZAÇÃO DE ITENS (Igual ao KDS Principal) ---
+                    let itemsHtml = '';
+
+                    if (o.items && o.items.length > 0) {
+                        o.items.forEach(item => {
+                            let detailsHtml = '';
+
+                            // Renderiza Detalhes (Sabores, Extras, Bordas)
+                            if (item.details && item.details.length > 0) {
+                                item.details.forEach(det => {
+                                    let txt = "";
+                                    let type = "info";
+
+                                    if (typeof det === 'object' && det !== null) {
+                                        txt = det.text || "";
+                                        type = det.type || "info";
+                                    } else {
+                                        txt = String(det);
+                                    }
+
+                                    // Limpeza Visual
+                                    const displayTxt = txt.replace('🧀 ', '').replace('Borda:', '').replace('•', '').replace('+', '').trim();
+
+                                    // Estilos por Tipo
+                                    if (txt.includes('🧀') || txt.toUpperCase().includes('BORDA:') || type === 'edge') {
+                                        detailsHtml += `<div class="text-orange-400 font-bold text-xs mt-1 border-t border-dashed border-slate-700 pt-1 ml-1"><i class="fas fa-ring text-[10px]"></i> Borda: ${displayTxt}</div>`;
+                                    } else if (txt.trim().startsWith('•') || type === 'flavor') {
+                                        detailsHtml += `<div class="text-slate-200 font-bold text-sm ml-1 mt-0.5 border-l-2 border-indigo-500 pl-2">${displayTxt}</div>`;
+                                    } else if (txt.trim().startsWith('+') || type === 'addon') {
+                                        detailsHtml += `<div class="text-green-400 text-xs ml-3 font-medium"><i class="fas fa-plus text-[8px] opacity-50"></i> ${displayTxt}</div>`;
+                                    } else {
+                                        detailsHtml += `<div class="text-slate-400 text-xs ml-2">${txt}</div>`;
+                                    }
+                                });
+                            }
+
+                            // Remoções
+                            if (item.removed && item.removed.length > 0) {
+                                item.removed.forEach(rem => {
+                                    detailsHtml += `<div class="text-red-400 text-xs font-bold ml-1 mt-1"><i class="fas fa-ban text-[10px]"></i> Sem ${rem}</div>`;
+                                });
+                            }
+
+                            // Observação
+                            if (item.observation) {
+                                detailsHtml += `<div class="text-yellow-500 text-xs font-bold bg-yellow-900/10 p-1 rounded mt-1 border border-yellow-500/20"><i class="far fa-comment-alt"></i> ${item.observation}</div>`;
+                            }
+
+                            // HTML do Item Completo
+                            itemsHtml += `
+                        <div class="mb-2 pb-2 border-b border-slate-700/50 last:border-0 last:pb-0 last:mb-0">
+                            <div class="flex justify-between items-start">
+                                <span class="text-white font-bold text-sm leading-tight">${item.quantity}x ${item.name}</span>
+                            </div>
+                            <div class="mt-1 space-y-0.5">
+                                ${detailsHtml}
+                            </div>
+                        </div>`;
+                        });
+                    }
+
+                    // HTML do Cartão do Histórico
+                    list.innerHTML += `
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 flex flex-col gap-2">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-2 bg-slate-950/30 -mx-3 -mt-3 px-3 pt-3 rounded-t-lg">
+                        <div>
+                            <div class="font-bold text-white text-sm">#${cleanId} - ${o.customer}</div>
+                            <div class="text-[10px] text-slate-500 font-mono">${o.time} • ${o.status}</div>
+                        </div>
+                        <button onclick="openLabelModal(${o.id}, '${cleanId}', false)" class="bg-slate-800 hover:bg-indigo-600 hover:text-white text-indigo-400 border border-slate-600 p-2 rounded-lg transition shadow-lg" title="Reimprimir">
+                            <i class="fas fa-print"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="bg-black/20 p-2 rounded border border-white/5">
+                        ${itemsHtml || '<span class="text-slate-500 text-xs italic">Sem itens listados.</span>'}
+                    </div>
+                </div>`;
+                });
+
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = '<div class="text-center text-red-400">Erro ao carregar.</div>';
+            }
+        }
+
+    </script>
+    {% endif %}
+</body>
+
+</html>

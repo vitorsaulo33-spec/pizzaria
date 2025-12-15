@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>App Motoboy</title>
+    <link href="/static/css/style.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { background-color: #0f172a; color: white; padding-bottom: 100px; -webkit-tap-highlight-color: transparent; font-family: sans-serif; }
+        .blink-red { animation: blinker 1s linear infinite; background-color: #7f1d1d; color: white; }
+        @keyframes blinker { 50% { opacity: 0.7; background-color: #ef4444; } }
+        .checklist-item:checked+label { text-decoration: line-through; color: #4ade80; opacity: 0.5; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .status-online { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
+        .status-offline { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; animation: pulse 2s infinite; }
+    </style>
+</head>
+<body>
+
+    {% if not is_online %}
+    <div class="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-6 border-4 border-slate-700 shadow-2xl relative">
+            <i class="fas fa-user-clock text-4xl text-yellow-500 animate-pulse"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-white mb-2">Aguardando Liberação</h1>
+        <p class="text-slate-400 text-sm mb-8 max-w-[250px]">
+            Olá <b>{{ driver.full_name.split()[0] }}</b>!<br>
+            Peça para o operador ativar seu turno no painel.
+        </p>
+        
+        <button onclick="location.reload()" class="w-full max-w-xs bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition active:scale-95">
+            <i class="fas fa-sync-alt"></i> JÁ FUI ATIVADO
+        </button>
+        
+        <a href="/logout?target=driver" class="mt-12 text-slate-600 text-xs flex items-center gap-1 hover:text-white transition">
+            <i class="fas fa-sign-out-alt"></i> Sair da conta
+        </a>
+    </div>
+    {% else %}
+
+    <input type="hidden" id="loggedDriverId" value="{{ driver.id }}">
+    <input type="hidden" id="storeAddress" value="{{ driver.store.address_text }}">
+
+    <div class="fixed top-0 w-full bg-slate-800 border-b border-slate-700 z-40 shadow-lg px-4 py-3 flex justify-between items-center h-16">
+        <div class="flex items-center">
+            <div id="wsStatus" class="status-dot status-offline" title="Desconectado"></div>
+            <div>
+                <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Saldo (Real)</p>
+                <div class="flex flex-col">
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-xl font-bold {{ 'text-green-400' if session.net >= 0 else 'text-red-400' }}">
+                            R$ {{ "%.2f"|format(session.net) }}
+                        </span>
+                        <span class="text-xs text-slate-500 font-bold bg-slate-900 px-2 py-0.5 rounded-full border border-slate-700">
+                            {{ session.count }} entregas
+                        </span>
+                    </div>
+                    
+                    <div class="flex gap-3 text-[10px] font-bold mt-1 bg-black/20 px-2 py-1 rounded border border-white/5 w-fit">
+                        <span class="text-emerald-500 flex items-center gap-1" title="Ganhos + Créditos">
+                            <i class="fas fa-arrow-up"></i> {{ "%.2f"|format(session.gross) }}
+                        </span>
+                        
+                        {% if session.debits > 0 %}
+                        <div class="w-px h-3 bg-slate-600"></div>
+                        <span class="text-red-400 flex items-center gap-1" title="Vales + Dívidas Antigas">
+                            <i class="fas fa-arrow-down"></i> {{ "%.2f"|format(session.debits) }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="openHistory()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 p-2.5 rounded-xl shadow-sm border border-slate-600"><i class="fas fa-history"></i></button>
+            <!--<button onclick="stopSession()" class="bg-red-500/10 text-red-400 border border-red-500/30 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 active:bg-red-500/20 transition"><i class="fas fa-stop-circle"></i> FECHAR</button>-->
+        </div>
+    </div>
+
+    <div class="mt-20 px-4 space-y-6">
+        {% if count == 0 %}
+        <div class="flex flex-col items-center justify-center py-16 text-slate-500">
+            <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                <i class="fas fa-box-open text-3xl opacity-30"></i>
+            </div>
+            <h2 class="text-lg font-bold text-slate-300">Aguardando Pedidos...</h2>
+            <button onclick="location.reload()" class="mt-8 bg-slate-800 px-6 py-3 rounded-full text-white font-bold shadow-lg border border-slate-700 active:bg-slate-700"><i class="fas fa-sync-alt mr-2"></i> Atualizar</button>
+        </div>
+        {% else %}
+
+        <div class="bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl border border-indigo-500/30 shadow-2xl relative overflow-hidden">
+            <h2 class="text-[10px] font-bold text-indigo-300 uppercase mb-4 tracking-widest border-b border-indigo-500/20 pb-2">Rota Inteligente</h2>
+            <div class="space-y-3 mb-5">
+                <label class="flex items-center gap-3 p-3 rounded-xl bg-black/30 border border-white/5 cursor-pointer active:bg-black/50 transition">
+                    <input type="checkbox" id="chk1" class="w-5 h-5 rounded bg-slate-700 border-slate-500 text-green-500 focus:ring-0 checklist-item" onchange="checkReady()">
+                    <span class="font-bold text-sm text-slate-200 select-none" for="chk1">Conferi Bebidas & Troco</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-xl bg-black/30 border border-white/5 cursor-pointer active:bg-black/50 transition">
+                    <input type="checkbox" id="chk2" class="w-5 h-5 rounded bg-slate-700 border-slate-500 text-green-500 focus:ring-0 checklist-item" onchange="checkReady()">
+                    <span class="font-bold text-sm text-slate-200 select-none" for="chk2">Peguei a Maquininha</span>
+                </label>
+            </div>
+            <a href="{{ maps_url }}" target="_blank" id="btnRoute" class="flex items-center justify-center w-full bg-slate-800 text-slate-500 py-4 rounded-xl font-bold text-lg pointer-events-none opacity-50 transition border-2 border-dashed border-slate-600">
+                <i class="fas fa-location-arrow mr-2"></i> INICIAR ROTA
+            </a>
+        </div>
+
+        <div class="bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl border border-indigo-500/30 shadow-2xl relative overflow-hidden mb-6">
+            <h2 class="text-[10px] font-bold text-indigo-300 uppercase mb-4 tracking-widest border-b border-indigo-500/20 pb-2">Rota Inteligente</h2>
+            <button onclick="generateRoute()" class="flex items-center justify-center w-full bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg transition active:scale-95">
+                <i class="fas fa-location-arrow mr-2"></i> GERAR ROTA SELECIONADA
+            </button>
+            <p class="text-center text-xs text-slate-400 mt-2">Selecione os pedidos abaixo para incluir na rota.</p>
+        </div>
+
+        <div class="space-y-6 pb-10"> 
+            <h3 class="text-xs font-bold text-slate-400 uppercase pl-1 flex items-center gap-2"><i class="fas fa-list-ul"></i> Entregas ({{ count }})</h3>
+            
+            {% for order in orders %}
+            <div class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg relative transition transform duration-200 order-card">
+                
+                <div class="absolute top-0 right-0 p-3 z-10">
+                    <input type="checkbox" 
+                           class="route-checkbox w-6 h-6 rounded bg-slate-700 border-slate-500 text-green-500 focus:ring-0 cursor-pointer" 
+                           checked 
+                           data-address="{{ order.address_street }}, {{ order.address_number }} - {{ order.address_neighborhood }}, {{ order.address_city }}">
+                </div>
+
+                <div class="p-5 pt-8"> 
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-bold text-xl text-white">{{ order.customer_name.split()[0] }}</h4>
+                            <p class="text-xs text-slate-400 font-mono mt-0.5">#{{ order.wabiz_id }}</p>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <a href="https://wa.me/{{ order.customer_phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}" target="_blank" 
+                            class="bg-green-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:bg-green-500 transition border border-green-500/50">
+                                <i class="fab fa-whatsapp text-xl"></i>
+                            </a>
+
+                            <a href="https://www.google.com/maps/search/?api=1&query={{ order.address_street }}+{{ order.address_number }}+{{ order.address_neighborhood }}&travelmode=driving" target="_blank" 
+                            class="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-500 transition border border-blue-500/50">
+                                <i class="fas fa-map-marked-alt text-lg"></i>
+                            </a>
+
+                            <a href="https://waze.com/ul?q={{ order.address_street }} {{ order.address_number }}, {{ order.address_neighborhood }}, {{ order.address_city }}&navigate=yes" target="_blank" 
+                            class="bg-cyan-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:bg-cyan-400 transition border border-cyan-400/50">
+                                <i class="fab fa-waze text-xl"></i>
+                            </a>
+
+                            <a href="tel:{{ order.customer_phone }}" 
+                            class="bg-slate-700 text-slate-200 w-10 h-10 rounded-full flex items-center justify-center border border-slate-600 hover:bg-slate-600 transition">
+                                <i class="fas fa-phone text-lg"></i>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-black/20 rounded-lg p-3 mb-4 border border-white/5 relative">
+                        <p class="text-sm text-slate-200 font-medium leading-snug pr-8">{{ order.address_street }}, {{ order.address_number }}</p>
+                        <span class="text-xs text-slate-500 block mt-1">{{ order.address_neighborhood }}</span>
+                    </div>
+
+                    {% if order.driver_notes_view %}
+                    <div class="bg-yellow-900/40 border-l-4 border-yellow-500 p-3 rounded-r-lg mb-4 animate-pulse">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h4 class="text-yellow-500 font-bold text-xs uppercase mb-0.5 tracking-wide">Observação</h4>
+                                <p class="text-yellow-100 text-sm font-medium leading-snug">{{ order.driver_notes_view }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700/50 mb-4 text-xs space-y-1.5">
+                        {% for item in order.driver_items_view %}
+                            <div class="border-b border-white/10 last:border-0 pb-3 mb-3 relative">
+                                
+                                {% if item.family %}
+                                    <div class="inline-block bg-yellow-500 text-slate-900 text-xs font-black uppercase px-2 py-1 rounded mb-2 shadow-sm transform -rotate-1 origin-bottom-left">
+                                        {{ item.family }}
+                                    </div>
+                                {% endif %}
+
+                                <div class="flex items-start w-full">
+                                    <div class="flex-1">
+                                        <span style="color: #fb923c !important; font-weight: 900; font-size: 16px; margin-right: 6px;">
+                                            {{ item.qty|int }}x
+                                        </span>
+                                        
+                                        <span style="color: white; font-weight: 700; font-size: 14px; line-height: 1.4;">
+                                            {{ item.name }}
+                                        </span>
+                                        {% if item.details_str %}
+                                            <div style="color: #94a3b8; font-size: 12px; font-weight: 500; margin-top: 2px; line-height: 1.2;">
+                                                {{ item.details_str }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if item.is_drink %}
+                                    <div style="margin-top: 6px; margin-left: 24px; font-size: 11px; font-weight: 800; color: #ffffff !important; background-color: #2563eb !important; padding: 4px 8px; border-radius: 4px; display: inline-block; border: 1px solid #60a5fa; box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);">
+                                        <i class="fas fa-glass-cheers mr-1"></i> BEBIDA - CONFIRA!
+                                    </div>
+                                {% elif not item.is_pizza and not item.is_esfiha %}
+                                    <div style="margin-top: 6px; margin-left: 24px; font-size: 11px; font-weight: 800; color: #ffffff !important; background-color: #475569 !important; padding: 4px 8px; border-radius: 4px; display: inline-block; border: 1px solid #94a3b8;">
+                                        <i class="fas fa-box-open mr-1"></i> PEGAR NA COZINHA
+                                    </div>
+                                {% endif %}
+                                </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="border-t border-slate-700 pt-3 mt-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-slate-500 font-bold uppercase">Taxa Entrega</span>
+                                <span class="text-sm font-bold text-yellow-400 font-mono">
+                                    {% if order.delivery_fee %} R$ {{ "%.2f"|format(order.delivery_fee) }} 
+                                    {% else %} <span class="text-slate-600">Grátis</span> {% endif %}
+                                </span>
+                            </div>
+
+                            <div class="text-right">
+                                <span class="text-[10px] text-slate-500 font-bold uppercase">Total</span>
+                                <span class="text-2xl font-black text-white font-mono">R$ {{ "%.2f"|format(order.total_value) }}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center mb-4 bg-slate-900/50 p-2.5 rounded-lg border border-slate-700/50">
+                            <span class="text-[10px] text-slate-500 font-bold uppercase flex items-center gap-2">
+                                <i class="fas fa-wallet text-indigo-400"></i> Pagamento
+                            </span>
+                            <span class="text-sm font-bold text-white leading-tight block">
+                                {{ order.driver_payment_view or 'A Combinar' }}
+                            </span>
+
+                            {% if order.driver_change_view %}
+                                <div class="mt-1 inline-block bg-yellow-500 text-slate-900 px-2 py-0.5 rounded font-black text-sm shadow-lg border border-yellow-400 animate-pulse">
+                                    TROCO: R$ {{ order.driver_change_view }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <button onclick="finishDelivery({{ order.id }})" class="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl font-bold text-sm shadow-lg flex items-center justify-center gap-2 active:scale-95 transition">
+                            <i class="fas fa-check-circle text-lg"></i> MARCAR COMO ENTREGUE
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="historyModal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-sm max-h-[80vh] flex flex-col border border-slate-600 shadow-2xl">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900 rounded-t-2xl"><h3 class="font-bold text-white flex items-center gap-2"><i class="fas fa-history text-indigo-400"></i> Histórico (Hoje)</h3><button onclick="document.getElementById('historyModal').classList.add('hidden')" class="text-slate-400 hover:text-white p-2"><i class="fas fa-times text-xl"></i></button></div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll">
+                {% if history %}{% for h in history %}<div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex justify-between items-center"><div><div class="text-xs text-slate-400 font-mono font-bold">{{ h.time }} • #{{ h.id }}</div><div class="text-sm text-white font-medium truncate w-48">{{ h.address }}</div></div><div class="text-right"><div class="text-xs text-green-400 font-bold">+R$ {{ "%.2f"|format(h.fee) }}</div><div class="text-[10px] text-slate-500">Taxa</div></div></div>{% endfor %}{% else %}<div class="text-center text-slate-500 py-10">Nenhuma entrega finalizada ainda.</div>{% endif %}
+            </div>
+            <div class="p-4 border-t border-slate-700 bg-slate-900 rounded-b-2xl text-center"><button onclick="document.getElementById('historyModal').classList.add('hidden')" class="text-sm text-slate-400 hover:text-white font-bold">FECHAR</button></div>
+        </div>
+    </div>
+
+    <script>
+        let MY_DRIVER_ID = null;
+        const idInput = document.getElementById('loggedDriverId');
+        if(idInput) MY_DRIVER_ID = parseInt(idInput.value);
+
+        let socket;
+        let pingInterval;
+
+        // --- APENAS CONEXÃO E ATUALIZAÇÃO (SEM SOM) ---
+        document.addEventListener('DOMContentLoaded', () => {            
+            if(MY_DRIVER_ID) connectWebSocket();
+            history.pushState(null, null, location.href);
+            window.onpopstate = function () {
+                history.pushState(null, null, location.href);
+                Swal.fire({
+                    title: 'Sair?', icon: 'question', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#334155', confirmButtonText: 'Sim', background: '#1e293b', color: '#fff'
+                }).then((r) => { if (r.isConfirmed) window.location.href = '/logout?target=driver'; });
+            };
+        });
+
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/kds?token={{ access_token }}`; 
+            
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = function() {
+                updateStatusDot('online');
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => { if (socket.readyState === WebSocket.OPEN) socket.send("keep-alive"); }, 30000);
+            };
+
+            socket.onmessage = function(event) {
+                const msg = event.data;
+                // Se for atualização para mim OU atualização geral, recarrega a página
+                if (msg.includes(`driver_update:${MY_DRIVER_ID}`) || msg === 'update') {
+                    if (!Swal.isVisible()) {
+                        // Feedback visual sutil
+                        const Toast = Swal.mixin({toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, background:'#10b981', color:'#fff'});
+                        Toast.fire({icon: 'info', title: 'Atualizando...'});
+                        setTimeout(() => location.reload(), 500);
+                    }
+                }
+            };
+
+            socket.onclose = function() {
+                updateStatusDot('offline');
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function updateStatusDot(s) { const d = document.getElementById('wsStatus'); if(d) d.className = s==='online'?'status-dot status-online':'status-dot status-offline'; }
+        function checkReady() { const c1=document.getElementById('chk1').checked; const c2=document.getElementById('chk2').checked; const btn=document.getElementById('btnRoute'); if(c1&&c2){ btn.classList.remove('bg-slate-800','text-slate-500','pointer-events-none','opacity-50','border-dashed'); btn.classList.add('bg-green-600','text-white','shadow-lg','border-transparent'); } else { btn.classList.add('bg-slate-800','text-slate-500','pointer-events-none','opacity-50','border-dashed'); btn.classList.remove('bg-green-600','text-white','shadow-lg','border-transparent'); } }
+        function openHistory() { document.getElementById('historyModal').classList.remove('hidden'); }
+        async function startSession() { try { await fetch('/driver/session/start', {method:'POST'}); location.reload(); } catch(e){} }
+        async function stopSession() { if((await Swal.fire({title:'Fechar Caixa?', icon:'warning', showCancelButton:true, confirmButtonColor:'#ef4444', background:'#1e293b', color:'#fff'})).isConfirmed) { const res = await fetch('/driver/session/stop', {method:'POST'}); const d = await res.json(); if(d.success) Swal.fire({title:'Fechado!', text:`Total: R$ ${d.summary.total.toFixed(2)}`, icon:'success', background:'#1e293b', color:'#fff'}).then(()=>location.reload()); } }
+        async function finishDelivery(id) { if((await Swal.fire({title:'Confirmar?', icon:'question', showCancelButton:true, confirmButtonColor:'#16a34a', background:'#1e293b', color:'#fff'})).isConfirmed) { await fetch(`/driver/complete/${id}`, {method:'POST'}); } }
+   
+        // --- FUNÇÃO DE ROTA MANUAL ---
+        function generateRoute() {
+            // 1. Pega o endereço da loja (Origem)
+            const storeAddr = document.getElementById('storeAddress').value;
+            if (!storeAddr) {
+                return Swal.fire('Erro', 'Endereço da loja não encontrado.', 'error');
+            }
+
+            // 2. Pega todos os checkboxes marcados
+            const checkedBoxes = document.querySelectorAll('.route-checkbox:checked');
+            
+            if (checkedBoxes.length === 0) {
+                return Swal.fire('Atenção', 'Selecione pelo menos um pedido para criar a rota.', 'warning');
+            }
+
+            // 3. Extrai os endereços dos pedidos
+            const addresses = Array.from(checkedBoxes).map(cb => cb.dataset.address);
+            
+            // 4. Monta a URL do Google Maps
+            const origin = encodeURIComponent(storeAddr);
+            
+            // O último endereço da lista será o Destino Final
+            // (O Google Maps otimiza melhor se tiver um destino fixo, ou você pode deixar o último clicado)
+            const destination = encodeURIComponent(addresses.pop());
+            
+            // Os demais viram paradas (Waypoints)
+            let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+            
+            if (addresses.length > 0) {
+                const waypoints = addresses.map(addr => encodeURIComponent(addr)).join('|');
+                url += `&waypoints=${waypoints}`;
+            }
+            
+            // 5. Abre no App/Navegador
+            window.open(url, '_blank');
+        }
+   
+   
+   </script>
+    {% endif %}
+</body>
+</html>

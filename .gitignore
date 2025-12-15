@@ -1,0 +1,10 @@
+.env
+db.sqlite3
+__pycache__/
+venv/
+media/
+
+# Ignorar chaves de segurança
+*.key
+*.ppk
+credenciais_oracle/

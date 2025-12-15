@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+requests
+python-dotenv
+jinja2
+pydantic
+apscheduler
+pytz
+google-generativeai
+bcrypt
+python-jose
+python-multipart
+pip freeze

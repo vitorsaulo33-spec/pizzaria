@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Marketing e Automação - ALIV{% endblock %}
+
+{% block content %}
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+                <i class="fab fa-whatsapp text-green-500"></i> Automação de Marketing
+            </h1>
+            <p class="text-slate-400 text-xs mt-1">Crie robôs que vendem por você automaticamente.</p>
+        </div>
+        <button onclick="openModal()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 transition">
+            <i class="fas fa-plus"></i> Nova Campanha
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for camp in campaigns %}
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden group hover:border-green-500/30 transition relative">
+            
+            <div class="absolute top-0 left-0 w-1 h-full {{ 'bg-green-500' if camp.is_active else 'bg-slate-600' }}"></div>
+
+            <div class="p-5">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <h3 class="font-bold text-white text-lg truncate max-w-[200px]">{{ camp.name }}</h3>
+                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-300 border border-slate-600">
+                            {{ camp.trigger_type }}
+                            {% if camp.days_delay > 0 %} • {{ camp.days_delay }} dias {% endif %}
+                        </span>
+                    </div>
+                    <div class="flex gap-1">
+                        <button onclick='editCampaign({{ camp | tojson }})' 
+                                class="w-8 h-8 rounded bg-slate-700 hover:bg-blue-600 hover:text-white text-slate-400 transition flex items-center justify-center">
+                            <i class="fas fa-edit text-xs"></i>
+                        </button>
+                        <button onclick="deleteCampaign({{ camp.id }})" 
+                                class="w-8 h-8 rounded bg-slate-700 hover:bg-red-600 hover:text-white text-slate-400 transition flex items-center justify-center">
+                            <i class="fas fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 relative min-h-[60px]">
+                    <i class="fas fa-quote-left text-slate-600 text-xs absolute top-2 left-2"></i>
+                    <p class="text-xs text-slate-300 italic pl-4 line-clamp-3">
+                        {{ camp.message_template }}
+                    </p>
+                </div>
+            </div>
+            
+            <div class="bg-slate-900/30 px-5 py-2 border-t border-slate-700 flex justify-between items-center">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Agendamento</span>
+                {% if camp.scheduled_at %}
+                <span class="text-xs font-mono text-purple-400">{{ camp.scheduled_at }}</span>
+                {% else %}
+                <span class="text-xs font-bold {{ 'text-green-400' if camp.is_active else 'text-red-400' }}">
+                    {{ 'RECORRENTE' if camp.is_active else 'PAUSADO' }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-3 text-center py-12 text-slate-500 bg-slate-800/50 rounded-xl border border-slate-700 border-dashed">
+            <i class="fas fa-robot text-4xl mb-3 opacity-30"></i>
+            <p>Nenhuma automação criada. Clique em "Nova Campanha" para começar.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div id="campModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
+        <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 p-6 transform transition-all scale-95 opacity-0 overflow-y-auto max-h-[90vh]" id="modalContent">
+            
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-white" id="modalTitle">Nova Campanha</h3>
+                    <p class="text-xs text-slate-400">Use a IA para criar a copy perfeita e o template.</p>
+                </div>
+                <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="bg-indigo-900/30 p-4 rounded-xl border border-indigo-500/30 mb-6">
+                <label class="text-xs font-bold text-indigo-300 uppercase block mb-2">✨ Pedir para a IA</label>
+                <div class="flex gap-2">
+                    <input type="text" id="aiGoal" placeholder="Ex: Oferta de chuva, Dia dos namorados, Cliente sumido..." class="flex-1 bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none focus:border-indigo-500">
+                    <button onclick="generateWithAI()" id="btnAiGen" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2">
+                        <i class="fas fa-magic"></i> Gerar
+                    </button>
+                </div>
+                <div id="aiInstructions" class="hidden mt-3 text-xs text-slate-300 bg-black/20 p-3 rounded border border-white/5">
+                    <p class="font-bold text-green-400 mb-1"><i class="fab fa-whatsapp"></i> Instruções para cadastrar na Meta:</p>
+                    <p>1. Nome do Modelo: <span class="font-mono text-white select-all cursor-pointer bg-slate-700 px-1 rounded" id="hintName">...</span></p>
+                    <p>2. Corpo do Texto: <span class="font-mono text-white select-all cursor-pointer bg-slate-700 px-1 rounded" id="hintBody">...</span></p>
+                    <p class="mt-1 text-[10px] opacity-70">Copie esses dados e cole no Gerenciador do WhatsApp.</p>
+                </div>
+            </div>
+            
+            <form id="campForm" onsubmit="submitCampaign(event)" class="space-y-4 border-t border-slate-700 pt-4">
+                <input type="hidden" name="camp_id" id="campId">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Nome Interno</label>
+                        <input type="text" name="name" id="campName" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-green-500">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-green-400 uppercase">Nome do Template (Meta)</label>
+                        <input type="text" name="meta_template_name" id="metaTemplateName" required placeholder="ex: promo_chuva_v1" class="w-full bg-slate-900 border border-green-600/50 rounded-lg p-2 text-green-400 font-mono text-sm outline-none focus:border-green-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Gatilho</label>
+                        <select name="trigger_type" id="campTrigger" onchange="toggleCampFields()" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-green-500">
+                            <option value="inactive">Recuperação (Inativos)</option>
+                            <option value="birthday">Aniversário</option>
+                            <option value="post_sale">Pós-Venda (NPS)</option>
+                            <option value="broadcast">📢 Disparo em Massa (Data Fixa)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="fieldDays">
+                        <label class="text-xs font-bold text-slate-400 uppercase" id="labelDays">Dias sem comprar</label>
+                        <input type="number" name="days_delay" id="campDays" value="15" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-green-500">
+                    </div>
+
+                    <div id="fieldDate" class="hidden">
+                        <label class="text-xs font-bold text-green-400 uppercase">Data e Hora do Disparo</label>
+                        <input type="datetime-local" name="scheduled_at" id="campDate" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-green-500">
+                    </div>
+                </div>
+
+                <div id="fieldSegmentation" class="hidden bg-slate-900/50 p-3 rounded-xl border border-slate-700 mt-2">
+                    <label class="text-xs font-bold text-purple-400 uppercase mb-2 block"><i class="fas fa-filter mr-1"></i> Segmentar Público</label>
+                    <div class="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                            <label class="text-[10px] text-slate-500 font-bold uppercase">Gasto Mínimo</label>
+                            <input type="number" name="filter_min_spent" id="filterMinSpent" placeholder="0" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-500 font-bold uppercase">Recência (Dias)</label>
+                            <input type="number" name="filter_last_order_days" id="filterRecency" placeholder="0" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                    </div>
+                    <label class="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Filtrar por Bairros</label>
+                    <div class="max-h-32 overflow-y-auto bg-slate-800 border border-slate-600 rounded p-2 grid grid-cols-2 gap-2">
+                        {% for bairro in available_neighborhoods %}
+                        <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-700 p-1 rounded">
+                            <input type="checkbox" name="filter_neighborhoods" value="{{ bairro }}" class="w-3 h-3 rounded bg-slate-900 border-slate-500 text-purple-500 focus:ring-purple-500 filter-bairro">
+                            <span class="text-xs text-slate-300 truncate" title="{{ bairro }}">{{ bairro }}</span>
+                        </label>
+                        {% else %}
+                        <span class="text-xs text-slate-500 col-span-2 italic">Nenhum bairro cadastrado ainda.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Corpo da Mensagem</label>
+                        <div class="text-[10px] text-slate-500 space-x-2">
+                            <span class="cursor-pointer hover:text-green-400" onclick="insertTag('{name}')">{name}</span>
+                            <span class="cursor-pointer hover:text-green-400" onclick="insertTag('{product}')">{product}</span>
+                        </div>
+                    </div>
+                    <textarea name="message_template" id="campMsg" rows="4" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-sm outline-none focus:border-green-500 leading-relaxed"></textarea>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <input type="checkbox" name="is_active" id="campActive" checked class="w-4 h-4 rounded bg-slate-900 border-slate-600 text-green-600 focus:ring-green-500">
+                    <label for="campActive" class="text-sm text-slate-300 cursor-pointer select-none">Automação Ativa</label>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t border-slate-700 mt-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white font-bold text-sm">Cancelar</button>
+                    <button type="submit" class="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm shadow-lg">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const modal = document.getElementById('campModal');
+    const content = document.getElementById('modalContent');
+
+    function openModal() {
+        document.getElementById('campForm').reset();
+        document.getElementById('campId').value = '';
+        document.getElementById('modalTitle').innerText = 'Nova Campanha';
+        document.getElementById('campActive').checked = true;
+        document.getElementById('aiGoal').value = '';
+        document.getElementById('aiInstructions').classList.add('hidden');
+        toggleCampFields();
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function closeModal() {
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => { modal.classList.add('hidden'); }, 200);
+    }
+
+    function toggleCampFields() {
+        const type = document.getElementById('campTrigger').value;
+        const fieldDays = document.getElementById('fieldDays');
+        const fieldDate = document.getElementById('fieldDate');
+        const fieldSeg = document.getElementById('fieldSegmentation');
+        const labelDays = document.getElementById('labelDays');
+
+        if (type === 'broadcast') {
+            fieldDays.classList.add('hidden');
+            fieldDate.classList.remove('hidden');
+            fieldSeg.classList.remove('hidden');
+        } else {
+            fieldDays.classList.remove('hidden');
+            fieldDate.classList.add('hidden');
+            fieldSeg.classList.add('hidden');
+            
+            if (type === 'post_sale') labelDays.innerText = 'Horas após entrega';
+            else labelDays.innerText = 'Dias sem comprar';
+        }
+    }
+
+    function editCampaign(data) {
+        document.getElementById('campId').value = data.id;
+        document.getElementById('campName').value = data.name;
+        document.getElementById('campTrigger').value = data.trigger_type;
+        document.getElementById('campDays').value = data.days_delay;
+        document.getElementById('campMsg').value = data.message_template;
+        document.getElementById('metaTemplateName').value = data.meta_template_name || '';
+        document.getElementById('campActive').checked = data.is_active;
+        
+        if (data.scheduled_at) {
+            document.getElementById('campDate').value = data.scheduled_at.slice(0, 16);
+        } else {
+            document.getElementById('campDate').value = '';
+        }
+
+        // Filtros
+        const rules = data.filter_rules || {};
+        document.getElementById('filterMinSpent').value = rules.min_spent || '';
+        document.getElementById('filterRecency').value = rules.last_order_days || '';
+        
+        document.querySelectorAll('.filter-bairro').forEach(cb => {
+            cb.checked = (rules.neighborhoods || []).includes(cb.value);
+        });
+
+        document.getElementById('modalTitle').innerText = 'Editar Campanha';
+        toggleCampFields();
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function insertTag(tag) {
+        const textarea = document.getElementById('campMsg');
+        textarea.setRangeText(tag, textarea.selectionStart, textarea.selectionEnd, 'end');
+        textarea.focus();
+    }
+
+    async function generateWithAI() {
+        const goal = document.getElementById('aiGoal').value;
+        const btn = document.getElementById('btnAiGen');
+        
+        if(!goal) return Swal.fire('Digite um objetivo', '', 'warning');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> ...';
+        
+        try {
+            const formData = new FormData();
+            formData.append('goal', goal);
+            const res = await fetch('/admin/campaigns/ai-generate', {method:'POST', body: formData});
+            const data = await res.json();
+            
+            if(data.error) throw new Error(data.error);
+            
+            document.getElementById('campName').value = goal;
+            document.getElementById('metaTemplateName').value = data.template_name;
+            document.getElementById('campMsg').value = data.message_body;
+            
+            document.getElementById('hintName').innerText = data.template_name;
+            document.getElementById('hintBody').innerText = data.message_body;
+            document.getElementById('aiInstructions').classList.remove('hidden');
+
+        } catch (e) {
+            Swal.fire('Erro na IA', 'Tente novamente.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic"></i> Gerar';
+        }
+    }
+
+    async function submitCampaign(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        
+        // Correção para evitar erro 422
+        const campId = formData.get('camp_id');
+        if (!campId || campId.trim() === '') formData.delete('camp_id');
+
+        const sched = formData.get('scheduled_at');
+        if (!sched || sched.trim() === '') formData.delete('scheduled_at');
+
+        if (!formData.get('days_delay')) formData.set('days_delay', '0');
+        if (!formData.get('filter_min_spent')) formData.set('filter_min_spent', '0');
+        if (!formData.get('filter_last_order_days')) formData.set('filter_last_order_days', '0');
+        
+        if(!document.getElementById('campActive').checked) formData.set('is_active', 'False');
+        else formData.set('is_active', 'True');
+
+        try {
+            const res = await fetch('/admin/campaigns/save', {method:'POST', body:formData});
+            if(res.ok) location.reload();
+            else throw new Error();
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Erro', text: 'Falha ao salvar.', background: '#1e293b', color: '#fff' });
+        }
+    }
+
+    async function deleteCampaign(id) {
+        if((await Swal.fire({
+            title: 'Excluir?', icon: 'warning', showCancelButton:true, confirmButtonColor: '#ef4444', background: '#1e293b', color: '#fff'
+        })).isConfirmed) {
+            await fetch(`/admin/campaigns/${id}`, {method:'DELETE'});
+            location.reload();
+        }
+    }
+</script>
+{% endblock %}

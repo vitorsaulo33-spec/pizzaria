@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Lojas - ALIV{% endblock %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-6 bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg">
+    <div>
+        <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+            <i class="fas fa-store text-indigo-500"></i> Minhas Lojas
+        </h1>
+        <p class="text-slate-400 text-sm">Gerencie as configurações de integração de cada cliente.</p>
+    </div>
+    <button onclick="openStoreModal()"
+        class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 transition">
+        <i class="fas fa-plus"></i> Nova Loja
+    </button>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for store in stores %}
+    <div
+        class="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl group hover:border-indigo-500/50 transition relative overflow-hidden">
+
+        <div class="absolute top-0 right-0 p-2">
+            <span
+                class="text-[10px] uppercase font-bold px-2 py-1 rounded {{ 'bg-green-900/50 text-green-400' if store.is_open else 'bg-red-900/50 text-red-400' }}">
+                {{ 'Aberta' if store.is_open else 'Fechada' }}
+            </span>
+        </div>
+
+        <div class="flex justify-between items-start mb-4">
+            <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-900 to-slate-800 flex items-center justify-center text-indigo-400 font-bold text-xl border border-indigo-500/30">
+                {{ store.name[:1] }}
+            </div>
+        </div>
+
+        <h3 class="text-xl font-bold text-white mb-1 truncate">{{ store.name }}</h3>
+        <p class="text-slate-500 text-xs mb-4 font-mono truncate">ID: {{ store.id }} • Slug: {{ store.slug }}</p>
+
+
+        <div class="flex gap-2 mb-4">
+            <i class="fab fa-facebook {{ 'text-blue-500' if store.fb_pixel_id else 'text-slate-600' }}"
+                title="Facebook CAPI"></i>
+            <i class="fab fa-google {{ 'text-orange-500' if store.ga4_measurement_id else 'text-slate-600' }}"
+                title="Google GA4"></i>
+            <i class="fab fa-whatsapp {{ 'text-green-500' if store.whatsapp_api_token else 'text-slate-600' }}"
+                title="WhatsApp API"></i>
+            <i class="fas fa-plug {{ 'text-purple-500' if store.integration_user else 'text-slate-600' }}"
+                title="Integração Pedidos"></i>
+        </div>
+
+        <div class="flex gap-2 border-t border-slate-700 pt-4">
+            <button onclick='editStore({{ store.id }}, {{ store | tojson }})'
+                class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-xs font-bold transition">
+                <i class="fas fa-cog mr-1"></i> Configurar
+            </button>
+            <button onclick="deleteStore({{ store.id }})"
+                class="px-3 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg transition border border-red-900/30">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="storeModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div
+        class="relative w-full max-w-2xl bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 p-6 max-h-[90vh] overflow-y-auto">
+
+        <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+            <h3 class="text-xl font-bold text-white" id="modalTitle">Configurar Loja</h3>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+
+        <form id="storeForm" onsubmit="submitStore(event)" class="space-y-6">
+            <input type="hidden" name="store_id" id="storeId">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Nome da Loja</label>
+                    <input type="text" name="name" id="storeName" required
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Slug (URL)</label>
+                    <input type="text" name="slug" id="storeSlug" required
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">WhatsApp (Dono)</label>
+                    <input type="text" name="whatsapp" id="storeWhats" placeholder="5511999..."
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="border-t border-slate-700 pt-4 mt-2">
+                    <p class="text-xs text-green-400 font-bold mb-3 uppercase"><i
+                            class="fas fa-map-marker-alt mr-1"></i> Endereço da Loja (Para o Mapa)</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Nome do Local (Ex: Aliv
+                                Pizzaria)</label>
+                            <input type="text" name="address_name" id="addrName"
+                                class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Endereço Escrito (Rua, Número
+                                - Cidade)</label>
+                            <input type="text" name="address_text" id="addrText"
+                                class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Latitude (Ex:
+                                -24.1856)</label>
+                            <input type="text" name="lat" id="addrLat"
+                                class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">Longitude (Ex:
+                                -46.7909)</label>
+                            <input type="text" name="lng" id="addrLng"
+                                class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                        </div>
+                        <div class="col-span-2 text-[10px] text-slate-500 italic">
+                            * Pegue Lat/Long clicando com o botão direito no Google Maps.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-end">
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-slate-400 uppercase">CRM Hora</label>
+                        <select name="crm_hour" id="storeCrmHour"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white outline-none">
+                            {% for h in range(0, 24) %}<option value="{{ h }}">{{ "%02d"|format(h) }}:00</option>{%
+                            endfor %}
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 mb-3">
+                        <input type="checkbox" name="is_open" id="storeOpen"
+                            class="w-4 h-4 rounded bg-slate-900 border-slate-600 text-green-500 focus:ring-green-500">
+                        <label for="storeOpen" class="text-sm text-slate-300 select-none">Loja Ativa</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4 bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <h4 class="text-sm font-bold text-purple-400 border-b border-slate-700 pb-2 mb-4">
+                    <i class="fas fa-plug"></i> Fontes de Pedidos
+                </h4>
+
+                <div class="bg-orange-900/10 border border-orange-500/30 p-4 rounded-xl mb-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h5 class="text-sm font-bold text-orange-400 flex items-center gap-2">
+                            <i class="fas fa-shopping-bag"></i> Wabiz Delivery
+                        </h5>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="wabizActive"
+                                class="w-4 h-4 rounded bg-slate-900 border-slate-600 text-orange-500 focus:ring-0">
+                            <span class="text-xs text-slate-300 font-bold select-none">Ativar</span>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="md:col-span-2">
+                            <label class="text-[10px] text-slate-500 font-bold uppercase">URL da API</label>
+                            <input type="text" id="wabizUrl" placeholder="https://delivery.wabiz.com.br/api/v1"
+                                class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-mono outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-500 font-bold uppercase">Usuário / Login</label>
+                            <input type="text" id="wabizUser"
+                                class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-500 font-bold uppercase">Senha / Token</label>
+                            <input type="password" id="wabizPass"
+                                class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-red-900/10 border border-red-500/30 p-4 rounded-xl">
+                    <div class="flex justify-between items-center mb-3">
+                        <h5 class="text-sm font-bold text-red-400 flex items-center gap-2">
+                            <i class="fas fa-utensils"></i> iFood
+                        </h5>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="ifoodActive"
+                                class="w-4 h-4 rounded bg-slate-900 border-slate-600 text-red-500 focus:ring-0">
+                            <span class="text-xs text-slate-300 font-bold select-none">Ativar</span>
+                        </label>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-[10px] text-slate-500 font-bold uppercase">Merchant ID (ID da
+                                Loja)</label>
+                            <input type="text" id="ifoodMerchant"
+                                class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-mono outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-[10px] text-slate-500 font-bold uppercase">Client ID</label>
+                                <input type="text" id="ifoodClient"
+                                    class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-mono outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-500 font-bold uppercase">Client Secret</label>
+                                <input type="password" id="ifoodSecret"
+                                    class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-mono outline-none">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="border-t border-slate-700 pt-4">
+                    <label class="text-xs font-bold text-blue-400 uppercase mb-2 block"><i
+                            class="fab fa-facebook mr-1"></i> Facebook CAPI</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" name="pixel_id" id="fbPixel" placeholder="Pixel ID"
+                            class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                        <input type="password" name="access_token" id="fbToken" placeholder="Access Token (EAAG...)"
+                            class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-700 pt-4">
+                    <label class="text-xs font-bold text-orange-400 uppercase mb-2 block"><i
+                            class="fab fa-google mr-1"></i> Google GA4</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" name="ga4_id" id="gaId" placeholder="Measurement ID (G-XXXX)"
+                            class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                        <input type="password" name="ga4_secret" id="gaSecret" placeholder="API Secret"
+                            class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-700 pt-4">
+                    <label class="text-xs font-bold text-green-400 uppercase mb-2 block"><i
+                            class="fab fa-whatsapp mr-1"></i> WhatsApp Cloud API</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" name="wa_phone_id" id="waId" placeholder="Phone Number ID"
+                            class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                        <input type="password" name="wa_token" id="waToken" placeholder="Permanent Token"
+                            class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-xs font-mono outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-6">
+                <button type="button" onclick="closeModal()"
+                    class="px-4 py-2 text-slate-400 hover:text-white font-bold text-sm">Cancelar</button>
+                <button type="submit"
+                    class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm shadow-lg">Salvar
+                    Configurações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const modal = document.getElementById('storeModal');
+
+    function editStore(id, data) {
+        // Ids ocultos e Dados Básicos
+        document.getElementById('storeId').value = id;
+        document.getElementById('storeName').value = data.name;
+        document.getElementById('storeSlug').value = data.slug;
+        document.getElementById('storeWhats').value = data.whatsapp_number || '';
+        document.getElementById('storeOpen').checked = data.is_open;
+        document.getElementById('storeCrmHour').value = data.crm_schedule_hour || 18;
+
+        // Endereço
+        document.getElementById('addrName').value = data.address_name || '';
+        document.getElementById('addrText').value = data.address_text || '';
+        document.getElementById('addrLat').value = data.address_lat || '';
+        document.getElementById('addrLng').value = data.address_lng || '';
+
+        // Tracking
+        document.getElementById('fbPixel').value = data.fb_pixel_id || '';
+        document.getElementById('fbToken').value = data.fb_access_token || '';
+        if (document.getElementById('gaId')) document.getElementById('gaId').value = data.ga4_measurement_id || '';
+        if (document.getElementById('gaSecret')) document.getElementById('gaSecret').value = data.ga4_api_secret || '';
+        document.getElementById('waId').value = data.whatsapp_phone_id || '';
+        document.getElementById('waToken').value = data.whatsapp_api_token || '';
+
+        // --- CORREÇÃO: LER DO JSON ESTRUTURADO ---
+        // Recupera o JSON salvo ou cria um objeto vazio
+        const config = data.integrations_config || {};
+
+        // 1. Preenche Wabiz
+        const wz = config.wabiz || {};
+        if (document.getElementById('wabizActive')) {
+            // Garante que lê boolean ou string 'true'
+            document.getElementById('wabizActive').checked = (wz.active === true || wz.active === 'true');
+        }
+        if (document.getElementById('wabizUrl')) document.getElementById('wabizUrl').value = wz.url || '';
+        if (document.getElementById('wabizUser')) document.getElementById('wabizUser').value = wz.user || '';
+        if (document.getElementById('wabizPass')) document.getElementById('wabizPass').value = wz.pass || '';
+
+        // 2. Preenche iFood
+        const ifood = config.ifood || {};
+        if (document.getElementById('ifoodActive')) {
+            document.getElementById('ifoodActive').checked = (ifood.active === true || ifood.active === 'true');
+        }
+        if (document.getElementById('ifoodMerchant')) document.getElementById('ifoodMerchant').value = ifood.merchant_id || '';
+        if (document.getElementById('ifoodClient')) document.getElementById('ifoodClient').value = ifood.client_id || '';
+        if (document.getElementById('ifoodSecret')) document.getElementById('ifoodSecret').value = ifood.client_secret || '';
+
+        document.getElementById('modalTitle').innerText = 'Editar ' + data.name;
+        document.getElementById('storeModal').classList.remove('hidden');
+    }
+
+    async function submitStore(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        // Corrige checkbox de Loja Aberta
+        formData.set('is_open', document.getElementById('storeOpen').checked ? 'True' : 'False');
+
+        // --- MONTA O JSON DE INTEGRAÇÕES ---
+        const integrations = {
+            "wabiz": {
+                "active": document.getElementById('wabizActive') ? document.getElementById('wabizActive').checked : false,
+                "url": document.getElementById('wabizUrl') ? document.getElementById('wabizUrl').value : '',
+                "user": document.getElementById('wabizUser') ? document.getElementById('wabizUser').value : '',
+                "pass": document.getElementById('wabizPass') ? document.getElementById('wabizPass').value : ''
+            },
+            "ifood": {
+                "active": document.getElementById('ifoodActive') ? document.getElementById('ifoodActive').checked : false,
+                "merchant_id": document.getElementById('ifoodMerchant') ? document.getElementById('ifoodMerchant').value : '',
+                "client_id": document.getElementById('ifoodClient') ? document.getElementById('ifoodClient').value : '',
+                "client_secret": document.getElementById('ifoodSecret') ? document.getElementById('ifoodSecret').value : ''
+            }
+        };
+
+        // Adiciona o JSON ao formulário para o Backend ler
+        formData.append('integrations_config_json', JSON.stringify(integrations));
+
+        try {
+            const res = await fetch('/admin/stores/save', { method: 'POST', body: formData });
+
+            if (res.ok) {
+                Swal.fire({ icon: 'success', title: 'Salvo!', showConfirmButton: false, timer: 1000, background: '#1e293b', color: '#fff' });
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                const err = await res.json();
+                throw new Error(err.message || 'Falha ao salvar');
+            }
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Erro', text: 'Verifique os dados.', background: '#1e293b', color: '#fff' });
+        }
+    }
+
+    function closeModal() { modal.classList.add('hidden'); }
+
+
+    async function deleteStore(id) {
+        const result = await Swal.fire({
+            title: 'Tem certeza?', text: "Se houver pedidos, a exclusão falhará.",
+            icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444',
+            background: '#1e293b', color: '#fff'
+        });
+
+        if (result.isConfirmed) {
+            const res = await fetch(`/admin/stores/${id}`, { method: 'DELETE' });
+            if (res.ok) location.reload();
+            else Swal.fire('Erro', 'Não foi possível excluir (Possui histórico).', 'error');
+        }
+    }
+</script>
+{% endblock %}

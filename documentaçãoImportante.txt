@@ -1,0 +1,17 @@
+Você terá dois terminais "virtuais" rodando sozinhos:
+
+O Site (API):
+
+Start/Stop: sudo systemctl restart pizzaria
+
+Ver Logs: sudo journalctl -u pizzaria -f
+
+Responsabilidade: Receber pedido e responder rápido.
+
+O Operário (Celery):
+
+Start/Stop: sudo systemctl restart pizzaria-worker
+
+Ver Logs: sudo journalctl -u pizzaria-worker -f
+
+Responsabilidade: Mandar WhatsApp, Calcular RFM, Processar Imagens.

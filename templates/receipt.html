@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cupom #{{ order.wabiz_id }}</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 10px; max-width: 300px; color: #000; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .line { border-bottom: 1px dashed #000; margin: 5px 0; }
+        .flex { display: flex; justify-content: space-between; }
+        .item-box { margin-bottom: 8px; }
+        .details { font-size: 11px; margin-left: 10px; display: block; }
+        .obs { font-weight: bold; margin-left: 10px; }
+        .removed { text-decoration: line-through; margin-left: 10px; font-size: 10px;}
+        .big { font-size: 14px; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body onload="window.print()">
+
+    <div class="center">
+        <h2 style="margin:0;">ALIV PIZZARIA</h2>
+        <span>Delivery &amp; Retirada</span><br>
+        <span style="font-size:10px;">{{ now }}</span>
+    </div>
+
+    <div class="line"></div>
+
+    <div class="flex">
+        <span>PEDIDO:</span>
+        <span class="bold big">#{{ order.wabiz_id }}</span>
+    </div>
+    {% if order.platform %}
+    <div class="center bold">ORIGEM: {{ order.platform }}</div>
+    {% endif %}
+
+    <div class="line"></div>
+
+    <div class="bold">{{ order.customer_name }}</div>
+    <div>{{ order.customer_phone }}</div>
+    
+    {% if order.delivery_type == 'delivery' %}
+        <div style="margin-top:5px; font-weight:bold;">ENTREGA:</div>
+        <div>{{ order.address_street }}, {{ order.address_number }}</div>
+        <div>{{ order.address_neighborhood }}</div>
+        {% if order.address_complement %}
+        <div style="font-size:10px;">({{ order.address_complement }})</div>
+        {% endif %}
+    {% else %}
+        <div style="margin-top:5px; font-weight:bold; text-align:center;">
+            *** RETIRADA / MESA ***
+            {% if order.table_number %} <br>MESA {{ order.table_number }} {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="line"></div>
+    <div class="center bold">ITENS DO PEDIDO</div>
+    <div class="line"></div>
+
+    {% for item in items %}
+    <div class="item-box">
+        <div class="flex">
+            <span class="bold">{{ item.quantity|int }}x {{ item.name }}</span>
+        </div>
+
+        {% if item.details %}
+            {% for det in item.details %}
+                <span class="details">{{ det.text }}</span>
+            {% endfor %}
+        {% endif %}
+
+        {% if item.removed %}
+            {% for rem in item.removed %}
+                <span class="removed">Sem {{ rem }}</span><br>
+            {% endfor %}
+        {% endif %}
+
+        {% if item.observation %}
+            <span class="details obs">OBS: {{ item.observation }}</span>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="line"></div>
+
+    {% if order.delivery_fee > 0 %}
+    <div class="flex">
+        <span>Taxa Entrega:</span>
+        <span>R$ {{ "%.2f"|format(order.delivery_fee) }}</span>
+    </div>
+    {% endif %}
+
+    {% if order.discount > 0 %}
+    <div class="flex">
+        <span>Desconto:</span>
+        <span>- R$ {{ "%.2f"|format(order.discount) }}</span>
+    </div>
+    {% endif %}
+    
+    {% if order.service_fee > 0 %}
+    <div class="flex">
+        <span>Taxa Serviço:</span>
+        <span>R$ {{ "%.2f"|format(order.service_fee) }}</span>
+    </div>
+    {% endif %}
+
+    <div class="flex bold big" style="margin-top:5px;">
+        <span>TOTAL:</span>
+        <span>R$ {{ "%.2f"|format(order.total_value) }}</span>
+    </div>
+
+    <div class="line"></div>
+    
+    <div style="margin-bottom: 5px;">
+        <span class="bold">Pagamento:</span><br>
+        {{ order.payment_method }}
+    </div>
+
+    {% if order.driver_tip > 0 %}
+    <div class="flex">
+        <span>Caixinha Motoboy:</span>
+        <span>R$ {{ "%.2f"|format(order.driver_tip) }}</span>
+    </div>
+    {% endif %}
+
+    {% if order.notes %}
+    <div class="line"></div>
+    <div class="bold">OBSERVAÇÃO GERAL:</div>
+    <div>{{ order.notes }}</div>
+    {% endif %}
+
+    <br><br>
+    <div class="center">.</div>
+
+</body>
+</html>

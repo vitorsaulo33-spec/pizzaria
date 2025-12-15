@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Equipe - ALIV{% endblock %}
+
+{% block content %}
+<div class="max-w-[1600px] mx-auto p-6 space-y-6">
+
+    <div
+        class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+                <i class="fas fa-users-cog text-blue-500"></i> Gestão de Equipe
+            </h1>
+            <p class="text-slate-400 text-xs mt-1">Gerencie Donos, Gerentes, Caixas, Garçons e Motoboys.</p>
+        </div>
+
+        <div class="flex gap-2">
+            <button onclick="openModal()"
+                class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm">
+                <i class="fas fa-user-plus"></i> Novo Membro
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-md flex flex-col h-full">
+            <div class="p-3 border-b border-slate-700 bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2"><i class="fas fa-user-friends text-orange-400"></i> Garçons</h3>
+            </div>
+            <div class="p-2 space-y-2 flex-1 overflow-y-auto max-h-[500px] custom-scroll">
+                {% for u in users if u.role == 'waiter' %}
+                <div class="bg-slate-900 p-3 rounded-lg flex justify-between items-center group border border-transparent hover:border-slate-600 transition">
+                    <div>
+                        <div class="font-bold text-white text-sm">{{ u.full_name }}</div>
+                        <div class="text-[10px] text-slate-500">{{ u.email }}</div>
+                        {% if u.phone %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-400 font-mono">{{ u.phone }}</span>
+                            <a href="https://wa.me/55{{ u.phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}" 
+                               target="_blank"
+                               class="text-green-400 hover:text-green-300 transition bg-green-900/20 px-1.5 py-0.5 rounded border border-green-900/30">
+                                <i class="fab fa-whatsapp text-xs"></i>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                        <button onclick="editUser({{ u.id }}, '{{ u.full_name }}', '{{ u.email }}', '{{ u.phone or '' }}', '{{ u.role }}', {{ u.store_id }})" class="text-blue-400 hover:text-white"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteUser({{ u.id }})" class="text-red-400 hover:text-white"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                {% else %}<div class="text-center py-6 text-slate-600 text-xs italic">Nenhum garçom.</div>{% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-md flex flex-col h-full">
+            <div class="p-3 border-b border-slate-700 bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2"><i class="fas fa-motorcycle text-green-400"></i> Motoboys</h3>
+            </div>
+            <div class="p-2 space-y-2 flex-1 overflow-y-auto max-h-[500px] custom-scroll">
+                {% for u in users if u.role == 'driver' %}
+                <div class="bg-slate-900 p-3 rounded-lg flex justify-between items-center group border border-transparent hover:border-slate-600 transition">
+                    <div>
+                        <div class="font-bold text-white text-sm">{{ u.full_name }}</div>
+                        <div class="text-[10px] text-slate-500">{{ u.email }}</div>
+                        {% if u.phone %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-400 font-mono">{{ u.phone }}</span>
+                            <a href="https://wa.me/55{{ u.phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}" 
+                               target="_blank"
+                               class="text-green-400 hover:text-green-300 transition bg-green-900/20 px-1.5 py-0.5 rounded border border-green-900/30">
+                                <i class="fab fa-whatsapp text-xs"></i>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                        <button onclick="editUser({{ u.id }}, '{{ u.full_name }}', '{{ u.email }}', '{{ u.phone or '' }}', '{{ u.role }}', {{ u.store_id }})" class="text-blue-400 hover:text-white"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteUser({{ u.id }})" class="text-red-400 hover:text-white"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                {% else %}<div class="text-center py-6 text-slate-600 text-xs italic">Vazio.</div>{% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-md flex flex-col h-full">
+            <div class="p-3 border-b border-slate-700 bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2"><i class="fas fa-fire text-red-500"></i> Cozinha & Produção</h3>
+            </div>
+            <div class="p-2 space-y-2 flex-1 overflow-y-auto max-h-[500px] custom-scroll">
+                {% for u in users if u.role in ['pizzaiolo', 'oven', 'cook', 'helper', 'expedidor'] %}
+                <div class="bg-slate-900 p-3 rounded-lg flex justify-between items-center group border border-transparent hover:border-slate-600 transition">
+                    <div>
+                        <div class="font-bold text-white text-sm">{{ u.full_name }}</div>
+                        <div class="flex gap-2 items-center">
+                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border 
+                                {% if u.role == 'pizzaiolo' %} bg-orange-900/30 text-orange-400 border-orange-500/30
+                                {% elif u.role == 'oven' %} bg-red-900/30 text-red-400 border-red-500/30
+                                {% elif u.role == 'expedidor' %} bg-blue-900/30 text-blue-400 border-blue-500/30
+                                {% else %} bg-slate-700 text-slate-300 border-slate-600 {% endif %}">
+                                {% if u.role == 'pizzaiolo' %}PIZZAIOLO
+                                {% elif u.role == 'oven' %}FORNEIRO
+                                {% elif u.role == 'cook' %}COZINHEIRO
+                                {% elif u.role == 'expedidor' %}EXPEDIDOR
+                                {% else %}AUXILIAR{% endif %}
+                            </span>
+                            <span class="text-[10px] text-slate-500">{{ u.email }}</span>
+                        </div>
+                        {% if u.phone %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-400 font-mono">{{ u.phone }}</span>
+                            <a href="https://wa.me/55{{ u.phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}" 
+                               target="_blank"
+                               class="text-green-400 hover:text-green-300 transition bg-green-900/20 px-1.5 py-0.5 rounded border border-green-900/30">
+                                <i class="fab fa-whatsapp text-xs"></i>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                        <button onclick="editUser({{ u.id }}, '{{ u.full_name }}', '{{ u.email }}', '{{ u.phone or '' }}', '{{ u.role }}', {{ u.store_id }})" class="text-blue-400 hover:text-white"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteUser({{ u.id }})" class="text-red-400 hover:text-white"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                {% else %}<div class="text-center py-6 text-slate-600 text-xs italic">Nenhuma equipe de cozinha.</div>{% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-md flex flex-col h-full">
+            <div class="p-3 border-b border-slate-700 bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2"><i class="fas fa-user-shield text-purple-400"></i> Gestão & Caixa</h3>
+            </div>
+            <div class="p-2 space-y-2 flex-1 overflow-y-auto max-h-[500px] custom-scroll">
+                {% for u in users if u.role in ['owner', 'manager', 'viewer'] %}
+                <div class="bg-slate-900 p-3 rounded-lg flex justify-between items-center group border border-transparent hover:border-slate-600 transition">
+                    <div>
+                        <div class="font-bold text-white text-sm">{{ u.full_name }}</div>
+                        <div class="flex gap-2 items-center">
+                             <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border 
+                                {% if u.role == 'owner' %} bg-purple-900/30 text-purple-400 border-purple-500/30
+                                {% elif u.role == 'manager' %} bg-yellow-900/30 text-yellow-400 border-yellow-500/30
+                                {% else %} bg-indigo-900/30 text-indigo-400 border-indigo-500/30 {% endif %}">
+                                {% if u.role == 'owner' %}DONO
+                                {% elif u.role == 'manager' %}GERENTE
+                                {% else %}CAIXA{% endif %}
+                            </span>
+                        </div>
+                        {% if u.phone %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-400 font-mono">{{ u.phone }}</span>
+                            <a href="https://wa.me/55{{ u.phone | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') }}" 
+                               target="_blank"
+                               class="text-green-400 hover:text-green-300 transition bg-green-900/20 px-1.5 py-0.5 rounded border border-green-900/30">
+                                <i class="fab fa-whatsapp text-xs"></i>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                        <button onclick="editUser({{ u.id }}, '{{ u.full_name }}', '{{ u.email }}', '{{ u.phone or '' }}', '{{ u.role }}', {{ u.store_id }})" class="text-blue-400 hover:text-white"><i class="fas fa-edit"></i></button>
+                        {% if u.role != 'owner' %}
+                        <button onclick="deleteUser({{ u.id }})" class="text-red-400 hover:text-white"><i class="fas fa-trash"></i></button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="userModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div class="relative w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 transform transition-all scale-95 opacity-0"
+        id="modalContent">
+
+        <form onsubmit="submitForm(event)" class="p-6 space-y-4">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-xl font-bold text-white" id="modalTitle">Novo Membro</h3>
+                <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+
+            <input type="hidden" name="user_id" id="userId">
+
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nome Completo</label>
+                <input type="text" name="full_name" id="fullName" required
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Login (Email)</label>
+                <input type="text" name="email" id="email" required
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">WhatsApp / Telefone</label>
+                <input type="text" name="phone" id="phone" 
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none transition"
+                    placeholder="(11) 99999-9999">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Senha</label>
+                    <input type="password" name="password" id="password"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none transition"
+                        placeholder="******">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Função</label>
+                    <select name="role" id="userRole" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none transition custom-scroll">
+                        <optgroup label="Operação de Salão">
+                            <option value="waiter">🤵 Garçom</option>
+                            <option value="viewer">💻 Operador de Caixa</option>
+                        </optgroup>
+                        
+                        <optgroup label="Logística">
+                            <option value="driver">🛵 Motoboy</option>
+                            <option value="expedidor">📦 Expedidor / Despacho</option>
+                        </optgroup>
+                        
+                        <optgroup label="Cozinha">
+                            <option value="pizzaiolo">🍕 Pizzaiolo</option>
+                            <option value="oven">🔥 Forneiro</option>
+                            <option value="cook">🍳 Cozinheiro</option>
+                            <option value="helper">🔪 Auxiliar de Cozinha</option>
+                        </optgroup>
+                        
+                        <optgroup label="Administração">
+                            <option value="manager">👔 Gerente</option>
+                            <option value="owner">👑 Dono (Acesso Total)</option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Loja Vinculada</label>
+                <select name="store_id" id="storeId"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none transition">
+                    {% for store in stores %}
+                    <option value="{{ store.id }}">{{ store.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="pt-4 flex justify-end gap-2 border-t border-slate-700 mt-2">
+                <button type="button" onclick="closeModal()"
+                    class="px-4 py-2 text-slate-400 hover:text-white text-sm font-bold">Cancelar</button>
+                <button type="submit"
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold shadow-lg transition">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const modal = document.getElementById('userModal');
+    const content = document.getElementById('modalContent');
+
+    function openModal() {
+        document.getElementById('userId').value = '';
+        document.getElementById('fullName').value = '';
+        document.getElementById('email').value = '';
+        document.getElementById('phone').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('userRole').value = 'waiter';
+        document.getElementById('modalTitle').innerText = "Novo Membro";
+        modal.classList.remove('hidden');
+        setTimeout(() => { content.classList.remove('scale-95', 'opacity-0'); content.classList.add('scale-100', 'opacity-100'); }, 10);
+    }
+
+    function editUser(id, name, email, phone, role, storeId) { // Adicionado phone
+        document.getElementById('userId').value = id;
+        document.getElementById('fullName').value = name;
+        document.getElementById('email').value = email;
+        document.getElementById('phone').value = phone; // <--- NOVO
+        document.getElementById('userRole').value = role;
+        document.getElementById('storeId').value = storeId;
+        document.getElementById('password').value = '';
+        document.getElementById('modalTitle').innerText = "Editar " + name;
+        modal.classList.remove('hidden');
+        setTimeout(() => { content.classList.remove('scale-95', 'opacity-0'); content.classList.add('scale-100', 'opacity-100'); }, 10);
+    }
+
+    function closeModal() {
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => { modal.classList.add('hidden'); }, 200);
+    }
+
+    async function submitForm(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        try {
+            const res = await fetch('/admin/users/save', { method: 'POST', body: fd });
+            if (res.ok) {
+                Swal.fire({
+                    icon: 'success', title: 'Salvo!', showConfirmButton: false, timer: 1000,
+                    background: '#1e293b', color: '#fff'
+                }).then(() => location.reload());
+            } else {
+                const data = await res.json();
+                Swal.fire({ icon: 'error', title: 'Erro', text: data.message || 'Falha', background: '#1e293b', color: '#fff' });
+            }
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Erro', text: 'Conexão falhou', background: '#1e293b', color: '#fff' });
+        }
+    }
+
+    async function deleteUser(id) {
+        if (confirm('Excluir?')) {
+            await fetch(`/admin/users/${id}`, { method: 'DELETE' });
+            location.reload();
+        }
+    }
+</script>
+{% endblock %}
