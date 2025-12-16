@@ -484,23 +484,23 @@ def track_web_event(
 
 @app.on_event("startup")
 def start_scheduler():
+    # --- VERSÃO ANTIGA (COMENTADA PARA EVITAR DUPLICIDADE) ---
+    # O robô agora roda separadamente via 'python run_robot.py'
+    # gerenciado pelo systemd (pizzaria-robo.service)
     
-    if os.getenv("RUN_SCHEDULER") != "true":
-        print("⏰ [Scheduler] Ignorado neste worker (aguardando flag RUN_SCHEDULER=true).")
-        return
+    # if os.getenv("RUN_SCHEDULER") != "true":
+    #     print("⏰ [Scheduler] Ignorado neste worker.")
+    #     return
     
-    # Garante fuso horário do Brasil
-    scheduler = BackgroundScheduler(timezone=pytz.timezone("America/Sao_Paulo"))
-
-    # Jobs importados de services/background_jobs.py
-    scheduler.add_job(sync_external_orders, "interval", seconds=30)
-    scheduler.add_job(run_crm_automations, "cron", minute=0, args=[SessionLocal()])
-    scheduler.add_job(run_opportunity_scanner, "interval", minutes=60)
-    scheduler.add_job(send_morning_reports, "cron", hour=8, minute=0)
-    scheduler.add_job(run_rfm_analysis_cron, "cron", hour=22, minute=35)
-
-    scheduler.start()
-    print("⏰ [Scheduler] Robôs iniciados (Refatorado).")
+    # scheduler = BackgroundScheduler(timezone=pytz.timezone("America/Sao_Paulo"))
+    # scheduler.add_job(sync_external_orders, "interval", seconds=30)
+    # scheduler.add_job(run_crm_automations, "cron", minute=0, args=[SessionLocal()])
+    # scheduler.add_job(run_opportunity_scanner, "interval", minutes=60)
+    # scheduler.add_job(send_morning_reports, "cron", hour=8, minute=0)
+    # scheduler.add_job(run_rfm_analysis_cron, "cron", hour=22, minute=35)
+    # scheduler.start()
+    
+    print("🚀 [API] Servidor iniciado (Modo Web - Sem Robôs).")
 
 
 # ==========================================
