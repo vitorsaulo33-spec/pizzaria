@@ -12,4 +12,3 @@ google-generativeai
 bcrypt
 python-jose
 python-multipart
-pip freeze

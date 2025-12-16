@@ -8,3 +8,6 @@ media/
 *.key
 *.ppk
 credenciais_oracle/
+*.sql
+
+tailwindcss.exe
